@@ -9,7 +9,7 @@ import { useState } from "react";
 export default function Sidebar({
   handleOnChange,
 }: {
-  handleOnChange: () => void;
+  handleOnChange?: () => void;
 }) {
   const segment = useSelectedLayoutSegment() || "dashboard";
   const [urlDropdownOpen, setUrlDropdownOpen] = useState(false);
@@ -36,7 +36,7 @@ export default function Sidebar({
                     width={155}
                     height={34}
                   />
-                  <button type="button" onClick={handleOnChange}>
+                  <button type="button" onClick={() => handleOnChange?.()}>
                     <Image
                       src={`${basePath}/images/menu-icon.svg`}
                       alt=""
@@ -84,6 +84,24 @@ export default function Sidebar({
               </Link>
             </li>
 
+
+            <li>
+              <Link
+                prefetch={false}
+                href="/setting"
+                className={segment == "setting" ? "active" : ""}
+              >
+                <div className="nav-icon">
+                  <Image
+                    src={`${basePath}/images/setting-icon.svg`}
+                    alt=""
+                    width={20}
+                    height={20}
+                  />
+                </div>
+                <span className="nav-text">Setting</span>
+              </Link>
+            </li>
 
 
             <li>

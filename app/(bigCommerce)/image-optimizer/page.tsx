@@ -493,7 +493,7 @@ export default function ImageOptimizerPage() {
             </button>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-5 pb-12">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-5 pb-3">
             <div className="flex flex-wrap items-center gap-5">
               <div className="flex items-center gap-3">
                 <span className="text-sm text-zinc-600">Filter by:</span>

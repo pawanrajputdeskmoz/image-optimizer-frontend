@@ -1,5 +1,5 @@
 import { useState, useImperativeHandle, forwardRef } from "react";
-import Home from "../../image-optimizer-setting/page";
+import Home from "../../setting/page";
 import Image from "next/image";
 import { basePath } from "@/app/lib/basePath";
 

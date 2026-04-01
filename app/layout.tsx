@@ -1,10 +1,8 @@
-"use client";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ReduxProvider from "./store/provider";
 import Sidebar from "./_components/sidebar";
-import { useState } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,25 +14,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const metadata: Metadata = {
+  title: "Image Optimizer",
+  description: "Image optimizer dashboard",
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [activeClass, setActiveClass] = useState(true);
   return (
-    <>
-
-      <section className={`frame-area bg-zinc-50 ${activeClass ? "activeNav" : ""}`}>
-        <div className="flex">
-          <Sidebar handleOnChange={() => setActiveClass(!activeClass)} />
-          <div className="min-h-full flex flex-col flex-1 w-full !p-6">
-            <ReduxProvider>{children}</ReduxProvider>
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <section className="frame-area bg-zinc-50">
+          <div className="flex">
+            <Sidebar />
+            <div className="min-h-full flex flex-col flex-1 w-full !p-6">
+              <ReduxProvider>{children}</ReduxProvider>
+            </div>
           </div>
-        </div>
-
-      </section>
-    </>
+        </section>
+      </body>
+    </html>
   );
 }
