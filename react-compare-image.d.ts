@@ -1,0 +1,27 @@
+declare module "react-compare-image" {
+  import type { ReactNode } from "react";
+
+  interface ReactCompareImageProps {
+    aspectRatio?: "taller" | "wider";
+    handle?: ReactNode;
+    handleSize?: number;
+    hover?: boolean;
+    leftImage: string;
+    leftImageAlt?: string;
+    leftImageCss?: object;
+    leftImageLabel?: string;
+    onSliderPositionChange?: (position: number) => void;
+    rightImage: string;
+    rightImageAlt?: string;
+    rightImageCss?: object;
+    rightImageLabel?: string;
+    skeleton?: ReactNode;
+    sliderLineColor?: string;
+    sliderLineWidth?: number;
+    sliderPositionPercentage?: number;
+    vertical?: boolean;
+  }
+
+  const ReactCompareImage: (props: ReactCompareImageProps) => import("react").JSX.Element;
+  export default ReactCompareImage;
+}

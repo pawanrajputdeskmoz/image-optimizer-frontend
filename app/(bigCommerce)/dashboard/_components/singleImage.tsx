@@ -1,13 +1,54 @@
-import { basePath } from "@/next.config";
+import { basePath } from "@/app/lib/basePath";
 import Image from "next/image";
-import { useContext, useEffect, useState } from "react";
-import { OverlayTrigger, Spinner, Tooltip } from "react-bootstrap";
-import { Api } from "@/app/_api/apiCall";
-import { toast } from "react-toastify";
+import { useCallback, useEffect, useState } from "react";
+import { ApiCall } from "@/app/_api/apiCall";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Previewmodal from "./previewModal";
-import UpgradePopup from "@/app/_lib/upgradePopup";
-import { GlobalContext } from "@/app/_context/global";
+
+type LegacyImage = {
+  id: number;
+  product_id: number;
+  description: string;
+  image_file: string;
+  url_thumbnail: string;
+  url: string;
+  is_optimize?: number;
+  is_thumbnail: boolean;
+  sort_order: number;
+};
+
+type CheckedPayload = {
+  img_alt: string;
+  old_alt_text: string;
+  img_name: string | undefined;
+  real_image: string;
+  product_id: number;
+  image_id: number;
+  is_thumbnail: boolean;
+  sort_order: number;
+  is_optimize: number;
+};
+
+type ApiRes = { status_code?: number; data?: { status?: number; image_size?: string }; message?: string };
+
+function readChannelDomain(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return (JSON.parse(localStorage.getItem("channel") ?? "{}") as { domain?: string }).domain ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function LoadingSpinner() {
+  return (
+    <span
+      className="inline-block size-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900"
+      aria-hidden
+    />
+  );
+}
 
 export default function Home({
   image,
@@ -17,47 +58,46 @@ export default function Home({
   setCheckedImage,
   openSettingsModal,
 }: {
-  image: any;
-  checkbox: any;
-  setUpdatedAltText: any;
-  componentKey: any;
-  setCheckedImage: any;
+  image: LegacyImage;
+  checkbox: boolean;
+  setUpdatedAltText: (p: { product_id: number; image_id: number; alt_text: string }, k: string | number) => void;
+  componentKey: string | number;
+  setCheckedImage: (c: boolean, p: CheckedPayload, k: string | number) => void;
   openSettingsModal?: () => void;
 }) {
   const router = useRouter();
 
   const [altText, setAltText] = useState(image.description);
   const [checked, setChecked] = useState(checkbox);
-  const [homeUrl, setHomeUrl] = useState("");
+  const [homeUrl] = useState(readChannelDomain);
   const [optimizeStatus, setOptimizeStatus] = useState(image.is_optimize);
   const [previewModal, setPreviewModal] = useState(false);
   const [size, setSize] = useState("");
-  const [showPopup, setShowPopup] = useState(false);
-  const { userStatus } = useContext(GlobalContext);
 
-  const getImageStatus = () => {
-    Api("imageOptimizer/getImagesStatus", {
+  const getImageStatus = useCallback(() => {
+    void ApiCall("imageOptimizer/getImagesStatus", {
       image_id: image.id,
       product_id: image.product_id,
       image_url: image.image_file,
-    }).then((data) => {
+    }).then((raw) => {
+      const data = raw as ApiRes;
       if (data.status_code == 200) {
-        setOptimizeStatus(data.data.status);
-        setSize(data.data.image_size);
+        setOptimizeStatus(data.data?.status);
+        setSize(data.data?.image_size ?? "");
       } else {
         setOptimizeStatus(0);
         setSize("> 1MB");
       }
     });
-  };
+  }, [image.id, image.product_id, image.image_file]);
 
   useEffect(() => {
     getImageStatus();
-  }, []);
+  }, [getImageStatus]);
 
   const imageOptimize = () => {
     setOptimizeStatus(5);
-    Api("imageOptimizer/imageOptimize", {
+    void ApiCall("imageOptimizer/imageOptimize", {
       img_alt: altText,
       old_alt_text: image.description,
       img_name: image.image_file.split("/").pop(),
@@ -66,7 +106,8 @@ export default function Home({
       image_id: image.id,
       is_thumbnail: image.is_thumbnail,
       sort_order: image.sort_order,
-    }).then((data) => {
+    }).then((raw) => {
+      const data = raw as ApiRes;
       if (data.status_code == 202) {
         setOptimizeStatus(0);
         if (openSettingsModal) {
@@ -90,10 +131,11 @@ export default function Home({
 
   const RestoreOptimizeImage = () => {
     setOptimizeStatus(5);
-    Api("imageOptimizer/RestoreOptimizeImage", {
+    void ApiCall("imageOptimizer/RestoreOptimizeImage", {
       product_id: image.product_id,
       image_id: image.id,
-    }).then((data) => {
+    }).then((raw) => {
+      const data = raw as ApiRes;
       if (data.status_code == 204 || data.status_code == 203) {
         setOptimizeStatus(1);
         toast.error(data.message);
@@ -127,12 +169,19 @@ export default function Home({
       },
       componentKey,
     );
-  }, [checked]);
-
-  useEffect(() => {
-    const channelObj = JSON.parse(localStorage?.getItem("channel") ?? "");
-    setHomeUrl(channelObj.domain);
-  }, []);
+  }, [
+    altText,
+    checked,
+    componentKey,
+    image.description,
+    image.id,
+    image.image_file,
+    image.is_optimize,
+    image.is_thumbnail,
+    image.product_id,
+    image.sort_order,
+    setCheckedImage,
+  ]);
 
   return (
     <>
@@ -224,19 +273,15 @@ export default function Home({
                 type="button"
                 className="imageOptimize-btn btn btn-default btn-disable"
               >
-                <Spinner size="sm" />
+                <LoadingSpinner />
               </button>
-              <OverlayTrigger
-                placement="top"
-                overlay={<Tooltip>Restore</Tooltip>}
+              <button
+                type="button"
+                className="custom-btn black-iconBtn btn-disable"
+                title="Restore"
               >
-                <button
-                  type="button"
-                  className="custom-btn black-iconBtn btn-disable"
-                >
-                  <Spinner size="sm" />
-                </button>
-              </OverlayTrigger>
+                <LoadingSpinner />
+              </button>
             </>
           ) : optimizeStatus == 1 ? (
             <>
@@ -247,23 +292,19 @@ export default function Home({
               >
                 Preview
               </button>
-              <OverlayTrigger
-                placement="top"
-                overlay={<Tooltip>Restore</Tooltip>}
+              <button
+                type="button"
+                className="custom-btn black-iconBtn"
+                title="Restore"
+                onClick={RestoreOptimizeImage}
               >
-                <button
-                  type="button"
-                  className="custom-btn black-iconBtn"
-                  onClick={RestoreOptimizeImage}
-                >
-                  <Image
-                    src={`${basePath}/images/restore-icon.svg`}
-                    width={20}
-                    height={20}
-                    alt=""
-                  />
-                </button>
-              </OverlayTrigger>
+                <Image
+                  src={`${basePath}/images/restore-icon.svg`}
+                  width={20}
+                  height={20}
+                  alt="Restore"
+                />
+              </button>
             </>
           ) : optimizeStatus == 2 ? (
             <>
@@ -273,22 +314,18 @@ export default function Home({
               >
                 Optimizing
               </button>
-              <OverlayTrigger
-                placement="top"
-                overlay={<Tooltip>Restore</Tooltip>}
+              <button
+                type="button"
+                className="custom-btn black-iconBtn btn-disable"
+                title="Restore"
               >
-                <button
-                  type="button"
-                  className="custom-btn black-iconBtn btn-disable"
-                >
-                  <Image
-                    src={`${basePath}/images/restore-icon.svg`}
-                    width={20}
-                    height={20}
-                    alt=""
-                  />
-                </button>
-              </OverlayTrigger>
+                <Image
+                  src={`${basePath}/images/restore-icon.svg`}
+                  width={20}
+                  height={20}
+                  alt="Restore"
+                />
+              </button>
             </>
           ) : optimizeStatus == 3 ? (
             <>
@@ -298,22 +335,18 @@ export default function Home({
               >
                 Restoring
               </button>
-              <OverlayTrigger
-                placement="top"
-                overlay={<Tooltip>Restore</Tooltip>}
+              <button
+                type="button"
+                className="custom-btn black-iconBtn btn-disable"
+                title="Restore"
               >
-                <button
-                  type="button"
-                  className="custom-btn black-iconBtn btn-disable"
-                >
-                  <Image
-                    src={`${basePath}/images/restore-icon.svg`}
-                    width={20}
-                    height={20}
-                    alt=""
-                  />
-                </button>
-              </OverlayTrigger>
+                <Image
+                  src={`${basePath}/images/restore-icon.svg`}
+                  width={20}
+                  height={20}
+                  alt="Restore"
+                />
+              </button>
             </>
           ) : (
             <>
@@ -325,23 +358,19 @@ export default function Home({
               >
                 Optimize
               </button>
-              <OverlayTrigger
-                placement="top"
-                overlay={<Tooltip>Restore</Tooltip>}
+              <button
+                disabled={image.image_file == ""}
+                type="button"
+                className="custom-btn black-iconBtn btn-disable"
+                title="Restore"
               >
-                <button
-                  disabled={image.image_file == ""}
-                  type="button"
-                  className="custom-btn black-iconBtn btn-disable"
-                >
-                  <Image
-                    src={`${basePath}/images/restore-icon.svg`}
-                    width={20}
-                    height={20}
-                    alt=""
-                  />
-                </button>
-              </OverlayTrigger>
+                <Image
+                  src={`${basePath}/images/restore-icon.svg`}
+                  width={20}
+                  height={20}
+                  alt="Restore"
+                />
+              </button>
             </>
           )}
         </div>

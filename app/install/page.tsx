@@ -5,17 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Loading from "../_components/loading";
 
 import { InstallApi } from "@/app/_api/apiCall";
-
-interface InstallResponse {
-  status_code?: number;
-  data?: {
-    api_token?: string;
-    shop?: string;
-    manage_services?: string;
-    user_id?: string;
-    channel_list?: Array<{ channel_id?: number }>;
-  };
-}
+import type { InstallResponse } from "./types";
 
 function InstallContent() {
   const router = useRouter();
@@ -23,6 +13,7 @@ function InstallContent() {
   const code = searchParams.get("code");
   const context = searchParams.get("context");
   const scope = searchParams.get("scope");
+  const singed_payload = searchParams.get("signed_payload_jwt");
 
   const [loading, setLoading] = useState(true);
   const [validUser, setValidUser] = useState(false);
@@ -30,17 +21,23 @@ function InstallContent() {
   useEffect(() => {
     let isMounted = true;
 
-    InstallApi("appInstall", { code, context, scope })
+    InstallApi("store/load-application", { code, context, scope, signed_payload_jwt: singed_payload })
       .then((data: InstallResponse) => {
         if (!isMounted) return;
 
-        const isValid = data?.status_code === 200;
+        if (data?.success == false) {
+          console.log("Install failed:", data.error);
+          setValidUser(false);
+          return;
+        }
+
+        const isValid = data?.success == true;
         setValidUser(isValid);
 
         if (isValid) {
           const result = data?.data;
           localStorage.setItem("api-token", result?.api_token ?? "");
-          localStorage.setItem("shop", result?.shop ?? "");
+          localStorage.setItem("shop", result?.storeHash ?? "");
           localStorage.setItem("manage_service", result?.manage_services ?? "");
           localStorage.setItem("user_id", result?.user_id ?? "");
           localStorage.setItem(
@@ -57,7 +54,7 @@ function InstallContent() {
     return () => {
       isMounted = false;
     };
-  }, [code, context, router, scope]);
+  }, [code, context, router, scope, singed_payload]);
 
   if (loading || validUser) return <Loading />;
 

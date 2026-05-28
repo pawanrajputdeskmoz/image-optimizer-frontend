@@ -5,6 +5,25 @@ import Image from "next/image";
 import { basePath } from "@/app/lib/basePath";
 import Link from "next/link";
 import { useState } from "react";
+import {
+  LayoutDashboard,
+  Image as ImageIcon,
+  Settings,
+  Link2,
+  TriangleAlert,
+  FilePenLine,
+  BadgeDollarSign,
+  ShieldCheck,
+  HelpCircle,
+} from "lucide-react";
+
+function SidebarIcon({
+  icon: Icon,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return <Icon className="h-5 w-5 text-zinc-700" />;
+}
 
 export default function Sidebar({
   handleOnChange,
@@ -55,12 +74,7 @@ export default function Sidebar({
                 className={segment == "dashboard" ? "active" : ""}
               >
                 <div className="nav-icon">
-                  <Image
-                    src={`${basePath}/images/dashboard-icon.svg`}
-                    alt=""
-                    width={20}
-                    height={20}
-                  />
+                  <SidebarIcon icon={LayoutDashboard} />
                 </div>
                 <span className="nav-text">Dashboard</span>
               </Link>
@@ -73,12 +87,7 @@ export default function Sidebar({
                 className={segment == "image-optimizer" ? "active" : ""}
               >
                 <div className="nav-icon">
-                  <Image
-                    src={`${basePath}/images/image-optimizer-icon.svg`}
-                    alt=""
-                    width={20}
-                    height={20}
-                  />
+                  <SidebarIcon icon={ImageIcon} />
                 </div>
                 <span className="nav-text">Image Optimizer</span>
               </Link>
@@ -92,12 +101,7 @@ export default function Sidebar({
                 className={segment == "setting" ? "active" : ""}
               >
                 <div className="nav-icon">
-                  <Image
-                    src={`${basePath}/images/setting-icon.svg`}
-                    alt=""
-                    width={20}
-                    height={20}
-                  />
+                  <SidebarIcon icon={Settings} />
                 </div>
                 <span className="nav-text">Setting</span>
               </Link>
@@ -113,12 +117,7 @@ export default function Sidebar({
                   aria-expanded={urlDropdownOpen}
                 >
                   <div className="nav-icon">
-                    <Image
-                      src={`${basePath}/images/url-editor-main-icon.svg`}
-                      width={20}
-                      height={20}
-                      alt=""
-                    />
+                    <SidebarIcon icon={Link2} />
                   </div>
                   <span className="nav-text">404 & URL</span>
                 </button>
@@ -131,12 +130,7 @@ export default function Sidebar({
                       onClick={() => setUrlDropdownOpen(false)}
                     >
                       <div className="nav-icon">
-                        <Image
-                          src={`${basePath}/images/404-fixer-icon.svg`}
-                          width={20}
-                          height={20}
-                          alt=""
-                        />
+                        <SidebarIcon icon={TriangleAlert} />
                       </div>
                       <span className="nav-text">404 Fixer</span>
                     </Link>
@@ -147,12 +141,7 @@ export default function Sidebar({
                       onClick={() => setUrlDropdownOpen(false)}
                     >
                       <div className="nav-icon">
-                        <Image
-                          src={`${basePath}/images/url-editor-icon.svg`}
-                          width={20}
-                          height={20}
-                          alt=""
-                        />
+                        <SidebarIcon icon={FilePenLine} />
                       </div>
                       <span className="nav-text">URL Editor</span>
                     </Link>
@@ -172,12 +161,7 @@ export default function Sidebar({
                 className={segment == "upgrade?tab=app" ? "active" : ""}
               >
                 <div className="nav-icon">
-                  <Image
-                    src={`${basePath}/images/upgrade-icon.svg`}
-                    alt=""
-                    width={20}
-                    height={20}
-                  />
+                  <SidebarIcon icon={BadgeDollarSign} />
                 </div>
                 <span className="nav-text">Upgrade</span>
               </Link>
@@ -190,12 +174,7 @@ export default function Sidebar({
                 className={segment == "upgrade?tab=seoServices" ? "active" : ""}
               >
                 <div className="nav-icon">
-                  <Image
-                    src={`${basePath}/images/seo-services-icon.svg`}
-                    alt=""
-                    width={20}
-                    height={20}
-                  />
+                  <SidebarIcon icon={ShieldCheck} />
                 </div>
                 <span className="nav-text">SEO Services</span>
               </Link>
@@ -208,12 +187,7 @@ export default function Sidebar({
                 className={segment == "help" ? "active" : ""}
               >
                 <div className="nav-icon">
-                  <Image
-                    src={`${basePath}/images/help-icon.svg`}
-                    alt=""
-                    width={20}
-                    height={20}
-                  />
+                  <SidebarIcon icon={HelpCircle} />
                 </div>
                 <span className="nav-text">Help</span>
               </Link>

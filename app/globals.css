@@ -272,3 +272,18 @@ body {
     @apply font-sans;
   }
 }
+
+/* Smoother before/after image compare slider */
+.image-compare-root [data-testid="container"] {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100%;
+}
+
+.image-compare-root [data-testid="container"] img {
+  will-change: clip-path;
+  -webkit-user-drag: none;
+}
