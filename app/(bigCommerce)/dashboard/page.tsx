@@ -51,6 +51,33 @@ function isImageOptimized(image: ImageItem): boolean {
   );
 }
 
+function parseIsThumbnail(value: unknown): boolean {
+  if (value === true || value === 1) {
+    return true;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1";
+  }
+  return false;
+}
+
+function getThumbnailImage(images: ImageItem[]): ImageItem | undefined {
+  if (!images?.length) {
+    return undefined;
+  }
+
+  const thumbnail = images.find((img) => img.isThumbnail);
+  if (thumbnail) {
+    return thumbnail;
+  }
+
+  const lowestSort = [...images].sort(
+    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+  );
+  return lowestSort[0];
+}
+
 function buildProductImageUrl(
   storeHash: string,
   imageFile?: string
@@ -161,6 +188,22 @@ function applyOptimizationResult(
   };
 }
 
+function resolveRestoredAltText(
+  image: ImageItem,
+  data: NonNullable<RestoreImageResponse["data"]>
+): string {
+  const fromResponse =
+    data.old_alt_text ??
+    data.oldAltText ??
+    data.bigcommerce_metadata?.description;
+
+  if (fromResponse != null && String(fromResponse).trim() !== "") {
+    return String(fromResponse).trim();
+  }
+
+  return image.alt;
+}
+
 function applyRestoreResult(
   image: ImageItem,
   removedImageId: number,
@@ -184,6 +227,7 @@ function applyRestoreResult(
     url: restoredUrl ?? image.url,
     imageFile,
     fileName: imageFile,
+    alt: resolveRestoredAltText(image, data),
     optimized: false,
     optimizationStatus: undefined,
   };
@@ -219,6 +263,9 @@ export default function DashboardPage() {
     Record<string, BulkOptimizeImageItem>
   >({});
   const [bulkOptimizePending, setBulkOptimizePending] = useState(false);
+  const [bulkRestorePending, setBulkRestorePending] = useState(false);
+  const [allOptimizedAlertOpen, setAllOptimizedAlertOpen] = useState(false);
+  const [productsRefreshNonce, setProductsRefreshNonce] = useState(0);
 
   /*
   |--------------------------------------------------------------------------
@@ -239,6 +286,41 @@ export default function DashboardPage() {
   );
 
   const bulkSelectedCount = bulkSelectedList.length;
+  const bulkSelectedOptimizedCount = useMemo(() => {
+    if (bulkSelectedList.length === 0) return 0;
+
+    let count = 0;
+    for (const item of bulkSelectedList) {
+      const product = products.find((p) => p.id === item.product_id);
+      const image = product?.images.find((img) => img.id === item.image_id);
+      if (image && isImageOptimized(image)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [bulkSelectedList, products]);
+
+  const bulkSelectedOptimizedList = useMemo(() => {
+    if (bulkSelectedList.length === 0) return [];
+
+    return bulkSelectedList.filter((item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      const image = product?.images.find((img) => img.id === item.image_id);
+      return Boolean(image && isImageOptimized(image));
+    });
+  }, [bulkSelectedList, products]);
+
+  const bulkSelectedNotOptimizedList = useMemo(() => {
+    if (bulkSelectedList.length === 0) return [];
+
+    return bulkSelectedList.filter((item) => {
+      const product = products.find((p) => p.id === item.product_id);
+      const image = product?.images.find((img) => img.id === item.image_id);
+      return Boolean(image && !isImageOptimized(image));
+    });
+  }, [bulkSelectedList, products]);
+
+  const bulkSelectedNotOptimizedCount = bulkSelectedNotOptimizedList.length;
 
   /*
   |--------------------------------------------------------------------------
@@ -251,19 +333,6 @@ export default function DashboardPage() {
       localStorage.getItem("store_hash") ||
       localStorage.getItem("shop") ||
       ""
-    );
-  };
-
-  const getDefaultImage = (
-    images: ImageItem[]
-  ): ImageItem | undefined => {
-    if (!images?.length) {
-      return undefined;
-    }
-
-    return (
-      images.find((img) => img.isThumbnail) ||
-      images[0]
     );
   };
 
@@ -445,8 +514,16 @@ export default function DashboardPage() {
   );
 
   const bulkOptimizeSelected = useCallback(async () => {
-    const payload = Object.values(bulkSelected);
+    if (!bulkSelectedList.length) {
+      return;
+    }
+
+    const payload = bulkSelectedNotOptimizedList;
+    const alreadyOptimizedCount =
+      bulkSelectedList.length - payload.length;
+
     if (!payload.length) {
+      setAllOptimizedAlertOpen(true);
       return;
     }
 
@@ -469,7 +546,8 @@ export default function DashboardPage() {
       }
 
       const queued = response?.data?.queued ?? payload.length;
-      const skipped = response?.data?.skipped ?? 0;
+      const skippedByApi = response?.data?.skipped ?? 0;
+      const skippedTotal = alreadyOptimizedCount + skippedByApi;
 
       setOptimizingKeys((prev) => {
         const next = { ...prev };
@@ -481,14 +559,69 @@ export default function DashboardPage() {
 
       setBulkSelected({});
       toast.success(
-        skipped > 0
-          ? `${queued} image(s) queued (${skipped} skipped)`
+        skippedTotal > 0
+          ? `${queued} image(s) queued (${skippedTotal} already optimized, skipped)`
           : `${queued} image(s) queued for optimization`
       );
     } finally {
       setBulkOptimizePending(false);
     }
-  }, [bulkSelected]);
+  }, [bulkSelectedList, bulkSelectedNotOptimizedList]);
+
+  const bulkRestoreSelected = useCallback(async () => {
+    const payload = bulkSelectedOptimizedList.map(({ product_id, image_id }) => ({
+      product_id,
+      image_id,
+    }));
+
+    if (!payload.length) {
+      return;
+    }
+
+    setBulkRestorePending(true);
+
+    setRestoringKeys((prev) => {
+      const next = { ...prev };
+      for (const item of payload) {
+        next[`${item.product_id}-${item.image_id}`] = true;
+      }
+      return next;
+    });
+
+    try {
+      const response = (await ApiCall(
+        "image-optimizer/bulk-restore",
+        payload,
+        { method: "POST", rawBody: true }
+      )) as {
+        success?: boolean;
+        message?: string;
+        error?: string;
+      };
+
+      if (response && typeof response === "object" && "error" in response) {
+        return;
+      }
+
+      if (response?.success === false) {
+        toast.error(response.message || "Bulk restore failed");
+        return;
+      }
+
+      toast.success(response.message || "Images restored");
+      setBulkSelected({});
+      setProductsRefreshNonce((n) => n + 1);
+    } finally {
+      setRestoringKeys((prev) => {
+        const next = { ...prev };
+        for (const item of payload) {
+          delete next[`${item.product_id}-${item.image_id}`];
+        }
+        return next;
+      });
+      setBulkRestorePending(false);
+    }
+  }, [bulkSelectedOptimizedList]);
 
   const optimizeImage = useCallback(
     async (productId: number, image: ImageItem) => {
@@ -695,6 +828,10 @@ export default function DashboardPage() {
     setCurrentPage(nextPage);
   };
 
+  const refreshListing = useCallback(() => {
+    setProductsRefreshNonce((n) => n + 1);
+  }, []);
+
   /*
   |--------------------------------------------------------------------------
   | DEBOUNCED SEARCH (lodash)
@@ -781,17 +918,9 @@ export default function DashboardPage() {
           const updated = { ...prev };
 
           for (const product of mappedProducts) {
-            if (
-              !updated[product.id] &&
-              product.images?.length
-            ) {
-              const defaultImage =
-                getDefaultImage(product.images);
-
-              if (defaultImage) {
-                updated[product.id] =
-                  defaultImage;
-              }
+            const thumbnail = getThumbnailImage(product.images);
+            if (thumbnail) {
+              updated[product.id] = thumbnail;
             }
           }
 
@@ -828,7 +957,7 @@ export default function DashboardPage() {
     return () => {
       isCancelled = true;
     };
-  }, [currentPage, debouncedSearch]);
+  }, [currentPage, debouncedSearch, productsRefreshNonce]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -839,18 +968,44 @@ export default function DashboardPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">Image Optimizer</h1>
 
-          {bulkSelectedCount > 0 ? (
+          <div className="flex gap-2">
             <button
               type="button"
-              disabled={bulkOptimizePending}
-              onClick={() => void bulkOptimizeSelected()}
-              className="rounded bg-black px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={refreshListing}
+              disabled={isLoadingProducts}
+              className="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {bulkOptimizePending
-                ? "Optimizing…"
-                : `Optimize (${bulkSelectedCount})`}
+              {isLoadingProducts ? "Refreshing…" : "Refresh"}
             </button>
-          ) : null}
+
+            {bulkSelectedCount > 0 ? (
+              <>
+                {bulkSelectedOptimizedCount > 0 ? (
+                  <button
+                    type="button"
+                    disabled={bulkRestorePending}
+                    onClick={() => void bulkRestoreSelected()}
+                    className="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {bulkRestorePending
+                      ? "Restoring…"
+                      : `Restore (${bulkSelectedOptimizedCount})`}
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  disabled={bulkOptimizePending}
+                  onClick={() => void bulkOptimizeSelected()}
+                  className="rounded bg-black px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {bulkOptimizePending
+                    ? "Optimizing…"
+                    : `Optimize (${bulkSelectedNotOptimizedCount > 0 ? bulkSelectedNotOptimizedCount : bulkSelectedCount})`}
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
 
         {/* SEARCH */}
@@ -930,13 +1085,15 @@ export default function DashboardPage() {
             >
               {products.map((product) => {
                 const selectedImage = selectedImages[product.id];
+                const listingImage =
+                  getThumbnailImage(product.images) ?? selectedImage;
 
                 return (
                   <AccordionItem key={product.id} value={`product-${product.id}`}>
                     <AccordionTrigger>
                       <div className="flex items-center gap-3">
                         <Image
-                          src={selectedImage?.url || PLACEHOLDER_IMAGE}
+                          src={listingImage?.url || PLACEHOLDER_IMAGE}
                           alt={product.name}
                           width={36}
                           height={36}
@@ -1167,6 +1324,42 @@ export default function DashboardPage() {
           image={previewTarget.image}
         />
       ) : null}
+
+      {allOptimizedAlertOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setAllOptimizedAlertOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="all-optimized-alert-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2
+              id="all-optimized-alert-title"
+              className="text-lg font-semibold text-gray-900"
+            >
+              Already optimized
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {bulkSelectedCount === 1
+                ? "The selected image is already optimized."
+                : `All ${bulkSelectedCount} selected images are already optimized.`}{" "}
+              Select images that have not been optimized yet, or use Restore
+              to revert optimized images.
+            </p>
+            <button
+              type="button"
+              onClick={() => setAllOptimizedAlertOpen(false)}
+              className="mt-6 w-full rounded bg-black px-4 py-2 text-sm text-white hover:bg-gray-900"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1208,8 +1401,9 @@ function mapApiProduct(
 
             sizeLabel: formatImageSizeKb(image.size),
 
-            isThumbnail:
-              image.is_thumbnail || false,
+            isThumbnail: parseIsThumbnail(
+              image.is_thumbnail ?? image.isThumbnail
+            ),
 
             sortOrder:
               typeof image.sort_order === "number"

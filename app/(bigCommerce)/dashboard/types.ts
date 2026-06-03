@@ -36,7 +36,8 @@ export type ApiImage = {
   url_standard?: string;
   url_thumbnail?: string;
   url_tiny?: string;
-  is_thumbnail?: boolean;
+  is_thumbnail?: boolean | number | string;
+  isThumbnail?: boolean | number | string;
   sort_order?: number;
   date_modified?: string;
   /** BigCommerce / backend optimization state when listing products */
@@ -136,6 +137,11 @@ export type RestoreImageResponse = {
     removed_image_id?: number;
     product_id?: number;
     restored_image_url?: string;
+    old_alt_text?: string | null;
+    oldAltText?: string | null;
+    bigcommerce_metadata?: {
+      description?: string | null;
+    };
   };
   error?: string;
 };
