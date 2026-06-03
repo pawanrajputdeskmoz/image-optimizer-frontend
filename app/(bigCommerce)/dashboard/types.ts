@@ -137,8 +137,13 @@ export type RestoreImageResponse = {
     removed_image_id?: number;
     product_id?: number;
     restored_image_url?: string;
+    backup_retention_days?: number;
+    old_image_size?: number;
+    oldImageSize?: number;
     old_alt_text?: string | null;
     oldAltText?: string | null;
+    old_file_name?: string | null;
+    oldFileName?: string | null;
     bigcommerce_metadata?: {
       description?: string | null;
     };
@@ -146,7 +151,8 @@ export type RestoreImageResponse = {
   error?: string;
 };
 
-export type BulkOptimizeImageItem = {
+/** Shared body for single/bulk optimize and restore requests */
+export type ImageActionPayload = {
   image_id: number;
   product_id: number;
   image_url: string;
@@ -156,6 +162,9 @@ export type BulkOptimizeImageItem = {
   channel_id: number;
   store_id: string;
 };
+
+/** @deprecated Use ImageActionPayload */
+export type BulkOptimizeImageItem = ImageActionPayload;
 
 export type BulkImageOptimizationResponse = {
   success?: boolean;

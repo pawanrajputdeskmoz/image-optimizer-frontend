@@ -1,4 +1,4 @@
-import type { BulkOptimizeImageItem, ImageItem } from "../types";
+import type { ImageActionPayload, ImageItem } from "../types";
 
 function readChannelId(): number {
   if (typeof window === "undefined") {
@@ -20,10 +20,10 @@ function readChannelId(): number {
   }
 }
 
-export function buildBulkOptimizeItem(
+export function buildImageActionPayload(
   productId: number,
   image: ImageItem,
-): BulkOptimizeImageItem {
+): ImageActionPayload {
   return {
     image_id: image.id,
     product_id: productId,
@@ -40,6 +40,14 @@ export function buildBulkOptimizeItem(
         ? localStorage.getItem("user_id") ?? ""
         : "",
   };
+}
+
+/** @deprecated Use buildImageActionPayload */
+export function buildBulkOptimizeItem(
+  productId: number,
+  image: ImageItem,
+): ImageActionPayload {
+  return buildImageActionPayload(productId, image);
 }
 
 export function bulkSelectionKey(productId: number, imageId: number) {

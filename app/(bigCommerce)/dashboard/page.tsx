@@ -17,13 +17,14 @@ import AltTextField from "./_components/altTextField";
 import ImageCompareModal from "./_components/imageCompareModal";
 import {
   buildBulkOptimizeItem,
+  buildImageActionPayload,
   bulkSelectionKey,
 } from "./_lib/bulkSelection";
 import type {
   ApiImageSize,
   ApiProduct,
   BulkImageOptimizationResponse,
-  BulkOptimizeImageItem,
+  ImageActionPayload,
   ImageItem,
   Product,
   ProductApiResponse,
@@ -192,16 +193,45 @@ function resolveRestoredAltText(
   image: ImageItem,
   data: NonNullable<RestoreImageResponse["data"]>
 ): string {
-  const fromResponse =
-    data.old_alt_text ??
-    data.oldAltText ??
-    data.bigcommerce_metadata?.description;
+  if (data.old_alt_text !== undefined || data.oldAltText !== undefined) {
+    return String(data.old_alt_text ?? data.oldAltText ?? "").trim();
+  }
 
-  if (fromResponse != null && String(fromResponse).trim() !== "") {
-    return String(fromResponse).trim();
+  const fromMeta = data.bigcommerce_metadata?.description;
+  if (fromMeta != null) {
+    return String(fromMeta).trim();
   }
 
   return image.alt;
+}
+
+function resolveRestoredImageFile(
+  image: ImageItem,
+  data: NonNullable<RestoreImageResponse["data"]>
+): { imageFile: string; fileName: string } {
+  const oldFileName = (data.old_file_name ?? data.oldFileName)?.trim();
+  if (oldFileName) {
+    return { imageFile: oldFileName, fileName: oldFileName };
+  }
+
+  const fromUrl = imageFileFromProductUrl(data.restored_image_url);
+  if (fromUrl) {
+    return { imageFile: fromUrl, fileName: fromUrl };
+  }
+
+  return { imageFile: image.imageFile, fileName: image.fileName };
+}
+
+function resolveRestoredSizeLabel(
+  image: ImageItem,
+  data: NonNullable<RestoreImageResponse["data"]>
+): string {
+  const bytes = data.old_image_size ?? data.oldImageSize;
+  if (typeof bytes === "number" && Number.isFinite(bytes)) {
+    return formatBytesToKb(bytes);
+  }
+
+  return image.sizeLabel;
 }
 
 function applyRestoreResult(
@@ -217,17 +247,17 @@ function applyRestoreResult(
     return image;
   }
 
-  const restoredUrl = data.restored_image_url;
-  const imageFile =
-    imageFileFromProductUrl(restoredUrl) ?? image.imageFile;
+  const { imageFile, fileName } = resolveRestoredImageFile(image, data);
+  const restoredUrl = data.restored_image_url ?? image.url;
 
   return {
     ...image,
     id: data.restored_image_id ?? image.id,
-    url: restoredUrl ?? image.url,
+    url: restoredUrl,
     imageFile,
-    fileName: imageFile,
+    fileName,
     alt: resolveRestoredAltText(image, data),
+    sizeLabel: resolveRestoredSizeLabel(image, data),
     optimized: false,
     optimizationStatus: undefined,
   };
@@ -260,7 +290,7 @@ export default function DashboardPage() {
   const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
   const [savingAltKeys, setSavingAltKeys] = useState<Record<string, true>>({});
   const [bulkSelected, setBulkSelected] = useState<
-    Record<string, BulkOptimizeImageItem>
+    Record<string, ImageActionPayload>
   >({});
   const [bulkOptimizePending, setBulkOptimizePending] = useState(false);
   const [bulkRestorePending, setBulkRestorePending] = useState(false);
@@ -569,10 +599,7 @@ export default function DashboardPage() {
   }, [bulkSelectedList, bulkSelectedNotOptimizedList]);
 
   const bulkRestoreSelected = useCallback(async () => {
-    const payload = bulkSelectedOptimizedList.map(({ product_id, image_id }) => ({
-      product_id,
-      image_id,
-    }));
+    const payload = bulkSelectedOptimizedList;
 
     if (!payload.length) {
       return;
@@ -632,12 +659,7 @@ export default function DashboardPage() {
       try {
         const response = (await ApiCall(
           `image-optimizer/single-image-optimization/${image.id}`,
-          {
-            product_id: productId,
-            image_url: image.imageFile,
-            is_thumbnail: image.isThumbnail ?? false,
-            sort_order: image.sortOrder ?? 0,
-          }
+          buildImageActionPayload(productId, image)
         )) as SingleImageOptimizationResponse;
 
         if (response?.error) {
@@ -718,18 +740,9 @@ export default function DashboardPage() {
       setRestoringKeys((prev) => ({ ...prev, [key]: true }));
 
       try {
-        const alt = getDisplayAlt(product.id, image);
-        const imageName =
-          image.fileName.split("/").pop() || image.fileName || "";
-
         const response = (await ApiCall(
           `image-optimizer/restore-image/${image.id}`,
-          {
-            product_id: product.id,
-            image_url: image.url,
-            imageName,
-            altText: alt,
-          }
+          buildImageActionPayload(product.id, image)
         )) as RestoreImageResponse;
 
         if (response && typeof response === "object" && "error" in response) {
@@ -780,12 +793,13 @@ export default function DashboardPage() {
         });
 
         const newImageId = result.restored_image_id ?? image.id;
+        const restoredAlt = resolveRestoredAltText(image, result);
         setAltDrafts((prev) => {
           const oldKey = altTextKey(product.id, image.id);
           const newKey = altTextKey(product.id, newImageId);
           const next = { ...prev };
           delete next[oldKey];
-          delete next[newKey];
+          next[newKey] = restoredAlt;
           return next;
         });
 
@@ -810,7 +824,7 @@ export default function DashboardPage() {
         });
       }
     },
-    [getDisplayAlt]
+    []
   );
 
   /*
