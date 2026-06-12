@@ -1,9 +1,10 @@
 "use client";
 
-import { ApiCall } from "@/app/_api/apiCall";
+import { CHANNEL_CHANGED_EVENT } from "@/app/_lib/channelStorage";
 import debounce from "lodash/debounce";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { ExternalLink, Star } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -14,24 +15,42 @@ import {
 } from "@/components/ui/accordion";
 
 import AltTextField from "./_components/altTextField";
+import CategoryImageListing from "./_components/categoryImageListing";
+import HomeImageListing from "./_components/homeImageListing";
 import ImageCompareModal from "./_components/imageCompareModal";
+import { isApiError, isApiFailure } from "./_lib/apiUtils";
+import { buildBulkOptimizeItem, bulkSelectionKey } from "./_lib/bulkSelection";
 import {
-  buildBulkOptimizeItem,
-  buildImageActionPayload,
-  bulkSelectionKey,
-} from "./_lib/bulkSelection";
+  bulkOptimizeAllImages,
+  bulkOptimizeImages,
+  bulkRestoreImages,
+  fetchProductList,
+  optimizeSingleImage,
+  restoreSingleImage,
+  updateImageAltText,
+} from "./_lib/imageOptimizerApi";
+import {
+  PLACEHOLDER_IMAGE,
+  applyOptimizationResult,
+  applyRestoreResult,
+  getThumbnailImage,
+  isImageOptimized,
+  mapApiProduct,
+  resolveRestoredAltText,
+} from "./_lib/productMappers";
 import type {
-  ApiImageSize,
-  ApiProduct,
-  BulkImageOptimizationResponse,
   ImageActionPayload,
   ImageItem,
+  ImageListType,
   Product,
-  ProductApiResponse,
-  RestoreImageResponse,
-  SingleImageOptimizationResponse,
-  UpdateAltTextResponse,
 } from "./types";
+
+const LIST_TYPE_OPTIONS: { id: ImageListType; label: string }[] = [
+  { id: "product", label: "Product" },
+  { id: "categories", label: "Categories" },
+  { id: "brand", label: "Brand" },
+  { id: "home", label: "Home" },
+];
 
 type PreviewTarget = {
   productId: number;
@@ -40,233 +59,15 @@ type PreviewTarget = {
 
 const PRODUCTS_PER_PAGE = 5;
 
-const PLACEHOLDER_IMAGE = "https://via.placeholder.com/60";
-
 function altTextKey(productId: number, imageId: number) {
   return `${productId}-${imageId}`;
-}
-
-function isImageOptimized(image: ImageItem): boolean {
-  return (
-    image.optimizationStatus === "optimized" || image.optimized === true
-  );
-}
-
-function parseIsThumbnail(value: unknown): boolean {
-  if (value === true || value === 1) {
-    return true;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    return normalized === "true" || normalized === "1";
-  }
-  return false;
-}
-
-function getThumbnailImage(images: ImageItem[]): ImageItem | undefined {
-  if (!images?.length) {
-    return undefined;
-  }
-
-  const thumbnail = images.find((img) => img.isThumbnail);
-  if (thumbnail) {
-    return thumbnail;
-  }
-
-  const lowestSort = [...images].sort(
-    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
-  );
-  return lowestSort[0];
-}
-
-function buildProductImageUrl(
-  storeHash: string,
-  imageFile?: string
-): string | null {
-  if (!imageFile?.trim() || !storeHash) {
-    return null;
-  }
-
-  const trimmed = imageFile.trim();
-
-  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-    return trimmed;
-  }
-
-  return `https://store-${storeHash}.mybigcommerce.com/product_images/${trimmed.replace(/^\//, "")}`;
-}
-
-function formatBytesToKb(bytes: number): string {
-  return `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-function formatImageSizeKb(size?: ApiImageSize): string {
-  if (
-    typeof size?.bytes !== "number" ||
-    !Number.isFinite(size.bytes)
-  ) {
-    return "—";
-  }
-
-  return formatBytesToKb(size.bytes);
-}
-
-function imageFileFromProductUrl(url?: string): string | null {
-  if (!url?.trim()) {
-    return null;
-  }
-
-  const marker = "/product_images/";
-  const idx = url.indexOf(marker);
-  if (idx === -1) {
-    return null;
-  }
-
-  return url.slice(idx + marker.length);
-}
-
-function resolveOptimizedImageFile(
-  image: ImageItem,
-  data: NonNullable<SingleImageOptimizationResponse["data"]>
-): { imageFile: string; fileName: string } {
-  const fromUrl = imageFileFromProductUrl(data.new_image_url);
-  if (fromUrl) {
-    return { imageFile: fromUrl, fileName: fromUrl };
-  }
-
-  const newName = data.imageMeta?.newImageName?.trim();
-  if (!newName) {
-    return { imageFile: image.imageFile, fileName: image.fileName };
-  }
-
-  if (newName.includes("/")) {
-    return { imageFile: newName, fileName: newName };
-  }
-
-  const slash = image.imageFile.lastIndexOf("/");
-  const prefix = slash >= 0 ? image.imageFile.slice(0, slash + 1) : "";
-  const imageFile = `${prefix}${newName}`;
-  return { imageFile, fileName: imageFile };
-}
-
-function applyOptimizationResult(
-  image: ImageItem,
-  oldImageId: number,
-  data: NonNullable<SingleImageOptimizationResponse["data"]>
-): ImageItem {
-  const matchesOldId =
-    image.id === oldImageId ||
-    Number(data.old_image_id) === image.id;
-
-  if (!matchesOldId) {
-    return image;
-  }
-
-  const optimizedBytes = data.optimizedImage?.optimized?.size;
-  const sizeLabel =
-    typeof optimizedBytes === "number" && Number.isFinite(optimizedBytes)
-      ? formatBytesToKb(optimizedBytes)
-      : image.sizeLabel;
-
-  const { imageFile, fileName } = resolveOptimizedImageFile(image, data);
-
-  const newAltText = data.imageMeta?.newAltText;
-  const alt =
-    newAltText != null && String(newAltText).trim() !== ""
-      ? String(newAltText).trim()
-      : image.alt;
-
-  return {
-    ...image,
-    id: data.new_image_id ?? image.id,
-    url: data.new_image_url ?? image.url,
-    imageFile,
-    fileName,
-    alt,
-    sizeLabel,
-    optimized: true,
-    optimizationStatus: "optimized",
-  };
-}
-
-function resolveRestoredAltText(
-  image: ImageItem,
-  data: NonNullable<RestoreImageResponse["data"]>
-): string {
-  if (data.old_alt_text !== undefined || data.oldAltText !== undefined) {
-    return String(data.old_alt_text ?? data.oldAltText ?? "").trim();
-  }
-
-  const fromMeta = data.bigcommerce_metadata?.description;
-  if (fromMeta != null) {
-    return String(fromMeta).trim();
-  }
-
-  return image.alt;
-}
-
-function resolveRestoredImageFile(
-  image: ImageItem,
-  data: NonNullable<RestoreImageResponse["data"]>
-): { imageFile: string; fileName: string } {
-  const oldFileName = (data.old_file_name ?? data.oldFileName)?.trim();
-  if (oldFileName) {
-    return { imageFile: oldFileName, fileName: oldFileName };
-  }
-
-  const fromUrl = imageFileFromProductUrl(data.restored_image_url);
-  if (fromUrl) {
-    return { imageFile: fromUrl, fileName: fromUrl };
-  }
-
-  return { imageFile: image.imageFile, fileName: image.fileName };
-}
-
-function resolveRestoredSizeLabel(
-  image: ImageItem,
-  data: NonNullable<RestoreImageResponse["data"]>
-): string {
-  const bytes = data.old_image_size ?? data.oldImageSize;
-  if (typeof bytes === "number" && Number.isFinite(bytes)) {
-    return formatBytesToKb(bytes);
-  }
-
-  return image.sizeLabel;
-}
-
-function applyRestoreResult(
-  image: ImageItem,
-  removedImageId: number,
-  data: NonNullable<RestoreImageResponse["data"]>
-): ImageItem {
-  const matches =
-    image.id === removedImageId ||
-    Number(data.removed_image_id) === image.id;
-
-  if (!matches) {
-    return image;
-  }
-
-  const { imageFile, fileName } = resolveRestoredImageFile(image, data);
-  const restoredUrl = data.restored_image_url ?? image.url;
-
-  return {
-    ...image,
-    id: data.restored_image_id ?? image.id,
-    url: restoredUrl,
-    imageFile,
-    fileName,
-    alt: resolveRestoredAltText(image, data),
-    sizeLabel: resolveRestoredSizeLabel(image, data),
-    optimized: false,
-    optimizationStatus: undefined,
-  };
 }
 
 export default function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [listType, setListType] = useState<ImageListType>("product");
   const [openProductAccordion, setOpenProductAccordion] = useState<string[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
@@ -293,9 +94,26 @@ export default function DashboardPage() {
     Record<string, ImageActionPayload>
   >({});
   const [bulkOptimizePending, setBulkOptimizePending] = useState(false);
+  const [bulkOptimizeAllPending, setBulkOptimizeAllPending] = useState(false);
   const [bulkRestorePending, setBulkRestorePending] = useState(false);
   const [allOptimizedAlertOpen, setAllOptimizedAlertOpen] = useState(false);
   const [productsRefreshNonce, setProductsRefreshNonce] = useState(0);
+
+  useEffect(() => {
+    const onChannelChanged = () => {
+      setListType("product");
+      setCurrentPage(1);
+      setBulkSelected({});
+      setSelectedImages({});
+      setOpenProductAccordion([]);
+      setProductsRefreshNonce((n) => n + 1);
+    };
+
+    window.addEventListener(CHANNEL_CHANGED_EVENT, onChannelChanged);
+    return () => {
+      window.removeEventListener(CHANNEL_CHANGED_EVENT, onChannelChanged);
+    };
+  }, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -357,7 +175,7 @@ export default function DashboardPage() {
   | HELPERS
   |--------------------------------------------------------------------------
   */
-  
+
   const getStoreHash = () => {
     return (
       localStorage.getItem("store_hash") ||
@@ -411,11 +229,11 @@ export default function DashboardPage() {
           p.id !== productId
             ? p
             : {
-                ...p,
-                images: p.images.map((img) =>
-                  img.id === imageId ? { ...img, alt } : img
-                ),
-              }
+              ...p,
+              images: p.images.map((img) =>
+                img.id === imageId ? { ...img, alt } : img
+              ),
+            }
         )
       );
 
@@ -441,20 +259,17 @@ export default function DashboardPage() {
       setSavingAltKeys((prev) => ({ ...prev, [key]: true }));
 
       try {
-        const response = (await ApiCall(
-          `image-optimizer/update-alt-text/${image.id}`,
-          {
-            product_id: product.id,
-            alt_text: alt,
-          },
-          { method: "PATCH" }
-        )) as UpdateAltTextResponse;
+        const response = await updateImageAltText({
+          imageId: image.id,
+          productId: product.id,
+          altText: alt,
+        });
 
-        if (response && typeof response === "object" && "error" in response) {
+        if (isApiError(response)) {
           return;
         }
 
-        if (response?.success === false) {
+        if (isApiFailure(response)) {
           toast.error(response.message || "Failed to save alt text");
           return;
         }
@@ -560,17 +375,13 @@ export default function DashboardPage() {
     setBulkOptimizePending(true);
 
     try {
-      const response = (await ApiCall(
-        "image-optimizer/bulk-image-optimization",
-        payload,
-        { method: "POST", rawBody: true }
-      )) as BulkImageOptimizationResponse;
+      const response = await bulkOptimizeImages(payload);
 
-      if (response && typeof response === "object" && "error" in response) {
+      if (isApiError(response)) {
         return;
       }
 
-      if (response?.success === false) {
+      if (isApiFailure(response)) {
         toast.error(response.message || "Bulk optimization failed");
         return;
       }
@@ -598,6 +409,37 @@ export default function DashboardPage() {
     }
   }, [bulkSelectedList, bulkSelectedNotOptimizedList]);
 
+  const bulkOptimizeAll = useCallback(async () => {
+    setBulkOptimizeAllPending(true);
+
+    try {
+      const response = await bulkOptimizeAllImages();
+
+      if (isApiError(response)) {
+        return;
+      }
+
+      if (isApiFailure(response)) {
+        toast.error(response.message || "Bulk image optimization failed");
+        return;
+      }
+
+      const queued = response?.data?.queued;
+      const skipped = response?.data?.skipped ?? 0;
+
+      toast.success(
+        response.message ||
+          (typeof queued === "number"
+            ? skipped > 0
+              ? `${queued} image(s) queued (${skipped} skipped)`
+              : `${queued} image(s) queued for optimization`
+            : "All images queued for optimization"),
+      );
+    } finally {
+      setBulkOptimizeAllPending(false);
+    }
+  }, []);
+
   const bulkRestoreSelected = useCallback(async () => {
     const payload = bulkSelectedOptimizedList;
 
@@ -616,21 +458,13 @@ export default function DashboardPage() {
     });
 
     try {
-      const response = (await ApiCall(
-        "image-optimizer/bulk-restore",
-        payload,
-        { method: "POST", rawBody: true }
-      )) as {
-        success?: boolean;
-        message?: string;
-        error?: string;
-      };
+      const response = await bulkRestoreImages(payload);
 
-      if (response && typeof response === "object" && "error" in response) {
+      if (isApiError(response)) {
         return;
       }
 
-      if (response?.success === false) {
+      if (isApiFailure(response)) {
         toast.error(response.message || "Bulk restore failed");
         return;
       }
@@ -657,13 +491,9 @@ export default function DashboardPage() {
       setOptimizingKeys((prev) => ({ ...prev, [key]: true }));
 
       try {
-        const response = (await ApiCall(
-          `image-optimizer/single-image-optimization/${image.id}`,
-          buildImageActionPayload(productId, image)
-        )) as SingleImageOptimizationResponse;
+        const response = await optimizeSingleImage(productId, image);
 
-        if (response?.error) {
-          console.error("Optimize failed:", response.error);
+        if (isApiError(response)) {
           return;
         }
 
@@ -678,11 +508,11 @@ export default function DashboardPage() {
             p.id !== productId
               ? p
               : {
-                  ...p,
-                  images: p.images.map((img) =>
-                    applyOptimizationResult(img, image.id, result)
-                  ),
-                }
+                ...p,
+                images: p.images.map((img) =>
+                  applyOptimizationResult(img, image.id, result)
+                ),
+              }
           )
         );
 
@@ -740,16 +570,13 @@ export default function DashboardPage() {
       setRestoringKeys((prev) => ({ ...prev, [key]: true }));
 
       try {
-        const response = (await ApiCall(
-          `image-optimizer/restore-image/${image.id}`,
-          buildImageActionPayload(product.id, image)
-        )) as RestoreImageResponse;
+        const response = await restoreSingleImage(product.id, image);
 
-        if (response && typeof response === "object" && "error" in response) {
+        if (isApiError(response)) {
           return;
         }
 
-        if (response?.success === false) {
+        if (isApiFailure(response)) {
           toast.error(response.message || "Failed to restore image");
           return;
         }
@@ -764,11 +591,11 @@ export default function DashboardPage() {
             p.id !== product.id
               ? p
               : {
-                  ...p,
-                  images: p.images.map((img) =>
-                    applyRestoreResult(img, image.id, result)
-                  ),
-                }
+                ...p,
+                images: p.images.map((img) =>
+                  applyRestoreResult(img, image.id, result)
+                ),
+              }
           )
         );
 
@@ -875,9 +702,13 @@ export default function DashboardPage() {
   */
 
   useEffect(() => {
+    if (listType !== "product") {
+      return;
+    }
+
     let isCancelled = false;
 
-    const fetchProducts = async () => {
+    const loadProducts = async () => {
       setIsLoadingProducts(true);
       setProductsError(null);
 
@@ -891,20 +722,15 @@ export default function DashboardPage() {
           return;
         }
 
-        const requestBody: Record<string, unknown> = {
-          store_hash: storeHash,
+        const response = await fetchProductList({
+          storeHash,
           page: currentPage,
           limit: PRODUCTS_PER_PAGE,
-        };
+          search: debouncedSearch,
+        });
 
-        const response = (await ApiCall(
-          "image-optimizer/get-all-products",
-          requestBody,
-          debouncedSearch ? { query: { query: debouncedSearch } } : undefined
-        )) as ProductApiResponse;
-
-        if (isCancelled || response?.error) {
-          if (!isCancelled && response?.error) {
+        if (isCancelled || isApiError(response)) {
+          if (!isCancelled && isApiError(response)) {
             setProductsError("Failed to load products.");
           }
           return;
@@ -966,12 +792,23 @@ export default function DashboardPage() {
       }
     };
 
-    fetchProducts();
+    void loadProducts();
 
     return () => {
       isCancelled = true;
     };
-  }, [currentPage, debouncedSearch, productsRefreshNonce]);
+  }, [currentPage, debouncedSearch, listType, productsRefreshNonce]);
+
+  const handleListTypeChange = useCallback((nextType: ImageListType) => {
+    if (nextType === listType) {
+      return;
+    }
+    setListType(nextType);
+    setCurrentPage(1);
+    setBulkSelected({});
+    setSelectedImages({});
+    setOpenProductAccordion([]);
+  }, [listType]);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -982,7 +819,18 @@ export default function DashboardPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-semibold">Image Optimizer</h1>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void bulkOptimizeAll()}
+              disabled={bulkOptimizeAllPending}
+              className="rounded bg-black px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkOptimizeAllPending
+                ? "Optimizing all…"
+                : "Bulk image optimization"}
+            </button>
+
             <button
               type="button"
               onClick={refreshListing}
@@ -1024,37 +872,75 @@ export default function DashboardPage() {
 
         {/* SEARCH */}
 
-        <input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search product..."
-          className="mb-4 w-full rounded border px-3 py-2 md:w-64"
-        />
+        {listType === "product" ? (
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search..."
+            className="mb-4 w-full rounded border px-3 py-2 md:w-64"
+          />
+        ) : null}
+
+        <div className="mb-4 flex flex-wrap gap-2">
+          {LIST_TYPE_OPTIONS.map((option) => {
+            const isActive = listType === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => handleListTypeChange(option.id)}
+                disabled={listType === "product" && isLoadingProducts && isActive}
+                className={`rounded px-4 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isActive
+                    ? "bg-black text-white"
+                    : "border border-gray-300 bg-white text-gray-900 hover:bg-gray-50"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {listType === "categories" ? (
+          <CategoryImageListing refreshNonce={productsRefreshNonce} />
+        ) : null}
+
+        {listType === "home" ? (
+          <HomeImageListing refreshNonce={productsRefreshNonce} />
+        ) : null}
+
+        {listType === "brand" ? (
+          <div className="rounded-lg border bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
+            Brand image listing coming soon.
+          </div>
+        ) : null}
 
         {/* PRODUCTS */}
 
-        {isLoadingProducts && products.length === 0 ? (
+        {listType === "product" && isLoadingProducts && products.length === 0 ? (
           <div className="flex items-center justify-center gap-3 rounded-lg border bg-gray-50 px-4 py-10 text-sm text-gray-600">
             <span className="inline-block size-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
             Loading products…
           </div>
         ) : null}
 
-        {productsError ? (
+        {listType === "product" && productsError ? (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {productsError}
           </div>
         ) : null}
 
-        {isLoadingProducts && products.length > 0 ? (
+        {listType === "product" && isLoadingProducts && products.length > 0 ? (
           <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
             <span className="inline-block size-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
             Updating…
           </div>
         ) : null}
 
-        {products.some((p) =>
+        {listType === "product" &&
+        products.some((p) =>
           p.images.some((img) => Boolean(img.imageFile))
         ) ? (
           <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm text-gray-700">
@@ -1083,6 +969,7 @@ export default function DashboardPage() {
           </label>
         ) : null}
 
+        {listType === "product" ? (
         <div className="rounded-xl border bg-white">
           <div className="h-[560px] overflow-y-auto p-3">
             <Accordion
@@ -1106,16 +993,42 @@ export default function DashboardPage() {
                   <AccordionItem key={product.id} value={`product-${product.id}`}>
                     <AccordionTrigger>
                       <div className="flex items-center gap-3">
-                        <Image
-                          src={listingImage?.url || PLACEHOLDER_IMAGE}
-                          alt={product.name}
-                          width={36}
-                          height={36}
-                          unoptimized
-                          className="size-9 rounded object-cover"
-                        />
+                        <div className="relative shrink-0">
+                          <Image
+                            src={listingImage?.url || PLACEHOLDER_IMAGE}
+                            alt={product.name}
+                            width={36}
+                            height={36}
+                            unoptimized
+                            className="size-9 rounded object-cover"
+                          />
+                          {listingImage?.isThumbnail ? (
+                            <span
+                              className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-amber-400 text-white shadow-sm"
+                              title="Product thumbnail"
+                              aria-label="Product thumbnail"
+                            >
+                              <Star className="size-2.5 fill-current" />
+                            </span>
+                          ) : null}
+                        </div>
 
-                        <p>{product.name}</p>
+                        <p className="flex items-center gap-1.5">
+                          <span className="truncate">{product.name}</span>
+                          {product.websiteUrl ? (
+                            <a
+                              href={product.websiteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 text-gray-400 hover:text-gray-700"
+                              title="Open product on website"
+                              aria-label={`Open ${product.name} on website`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="size-3.5" />
+                            </a>
+                          ) : null}
+                        </p>
                       </div>
                     </AccordionTrigger>
 
@@ -1131,7 +1044,7 @@ export default function DashboardPage() {
                                 .every((img) =>
                                   Boolean(
                                     bulkSelected[
-                                      bulkSelectionKey(product.id, img.id)
+                                    bulkSelectionKey(product.id, img.id)
                                     ]
                                   )
                                 )}
@@ -1168,13 +1081,12 @@ export default function DashboardPage() {
                           return (
                             <div
                               key={image.id}
-                              className={`flex items-center gap-4 rounded border p-3 transition-all ${
-                                isSelected
+                              className={`flex items-center gap-4 rounded border p-3 transition-all ${isSelected
                                   ? "border-blue-500 bg-blue-100"
                                   : isBulkChecked
                                     ? "border-gray-400 bg-gray-50"
                                     : "bg-white"
-                              }`}
+                                }`}
                             >
                               <input
                                 type="checkbox"
@@ -1194,22 +1106,46 @@ export default function DashboardPage() {
 
                               {/* IMAGE */}
 
-                              <Image
-                                src={image.url}
-                                alt={image.alt}
-                                width={56}
-                                height={56}
-                                unoptimized
-                                className="size-14 cursor-pointer rounded object-cover"
-                                onClick={() => selectImage(product.id, image)}
-                              />
+                              <div className="relative shrink-0">
+                                <Image
+                                  src={image.url}
+                                  alt={image.alt}
+                                  width={56}
+                                  height={56}
+                                  unoptimized
+                                  className="size-14 cursor-pointer rounded object-cover"
+                                  onClick={() => selectImage(product.id, image)}
+                                />
+                                {image.isThumbnail ? (
+                                  <span
+                                    className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-amber-400 text-white shadow-sm"
+                                    title="Product thumbnail"
+                                    aria-label="Product thumbnail"
+                                  >
+                                    <Star className="size-3 fill-current" />
+                                  </span>
+                                ) : null}
+                              </div>
 
                               {/* INFO */}
 
                               <div className="flex-1">
-                                <p className="text-sm font-medium">
-                                  {image.fileName}
-                                  <span className="ml-2 font-normal text-gray-500">
+                                <p className="flex items-center gap-1.5 text-sm font-medium">
+                                  <span className="truncate">{image.fileName}</span>
+                                  {image.url && image.url !== PLACEHOLDER_IMAGE ? (
+                                    <a
+                                      href={image.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex shrink-0 text-gray-400 hover:text-gray-700"
+                                      title="Open image in new tab"
+                                      aria-label={`Open ${image.fileName} in new tab`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <ExternalLink className="size-3.5" />
+                                    </a>
+                                  ) : null}
+                                  <span className="shrink-0 font-normal text-gray-500">
                                     {image.sizeLabel}
                                   </span>
                                 </p>
@@ -1220,7 +1156,7 @@ export default function DashboardPage() {
                                   disabled={!image.imageFile}
                                   isSaving={Boolean(
                                     savingAltKeys[
-                                      altTextKey(product.id, image.id)
+                                    altTextKey(product.id, image.id)
                                     ]
                                   )}
                                   onChange={(value) =>
@@ -1258,11 +1194,10 @@ export default function DashboardPage() {
                                   onClick={() =>
                                     optimizeImage(product.id, image)
                                   }
-                                  className={`rounded px-3 py-2 text-sm text-white disabled:cursor-not-allowed ${
-                                    optimized
+                                  className={`rounded px-3 py-2 text-sm text-white disabled:cursor-not-allowed ${optimized
                                       ? "bg-emerald-700 opacity-90"
                                       : "bg-black disabled:opacity-50"
-                                  }`}
+                                    }`}
                                 >
                                   {optimized
                                     ? "Optimized"
@@ -1295,9 +1230,11 @@ export default function DashboardPage() {
             </Accordion>
           </div>
         </div>
+        ) : null}
 
         {/* PAGINATION */}
 
+        {listType === "product" ? (
         <div className="mt-6 flex items-center justify-between">
           <span className="text-sm">
             Page {safeCurrentPage} of{" "}
@@ -1328,6 +1265,7 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+        ) : null}
       </div>
 
       {previewTarget ? (
@@ -1376,65 +1314,4 @@ export default function DashboardPage() {
       ) : null}
     </div>
   );
-}
-
-/*
-|--------------------------------------------------------------------------
-| API MAPPER
-|--------------------------------------------------------------------------
-*/
-
-function mapApiProduct(
-  product: ApiProduct,
-  storeHash: string
-): Product {
-  const images: ImageItem[] = Array.isArray(
-    product.images
-  )
-    ? product.images
-        .map((image) => {
-          const optimizationStatus = image.optimization_status;
-          const isOpt = optimizationStatus === "optimized";
-          const imageFile = image.image_file?.trim() || "";
-
-          return {
-            id: image.id,
-
-            imageFile,
-
-            url:
-              buildProductImageUrl(storeHash, imageFile) ||
-              image.url_thumbnail ||
-              image.url_zoom ||
-              image.url_tiny ||
-              PLACEHOLDER_IMAGE,
-
-            fileName: imageFile || `image-${image.id}`,
-
-            alt: image.description || "",
-
-            sizeLabel: formatImageSizeKb(image.size),
-
-            isThumbnail: parseIsThumbnail(
-              image.is_thumbnail ?? image.isThumbnail
-            ),
-
-            sortOrder:
-              typeof image.sort_order === "number"
-                ? image.sort_order
-                : 0,
-
-            optimizationStatus,
-            optimized: isOpt,
-          };
-        })
-        // Newest images last from API → show latest at top inside accordion
-        .reverse()
-    : [];
-
-  return {
-    id: product.id,
-    name: product.name,
-    images,
-  };
 }

@@ -5,6 +5,11 @@ import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import TemplateBox from "./_components/templateBox";
 import { ApiCall } from "@/app/_api/apiCall";
+import {
+  CHANNEL_CHANGED_EVENT,
+  readChannelId,
+} from "@/app/_lib/channelStorage";
+import { isApiError, isApiFailure } from "../dashboard/_lib/apiUtils";
 
 const QUALITY_MIN = 50;
 const QUALITY_MAX = 100;
@@ -77,17 +82,6 @@ const FORMAT_OPTIONS: FormatOption[] = [
     badge: { text: "Experimental", className: "bg-violet-100 text-violet-700" },
   },
 ];
-
-function readChannelId(): number {
-  try {
-    const raw = localStorage.getItem("channel");
-    if (!raw) return 1;
-    const p = JSON.parse(raw) as { channel_id?: number };
-    return typeof p.channel_id === "number" ? p.channel_id : 1;
-  } catch {
-    return 1;
-  }
-}
 
 type SettingsRow = {
   channel_id: number;
@@ -225,6 +219,11 @@ export default function SettingsUI() {
     setChannelId(cid);
 
     const data = await ApiCall("settings", {}, { method: "GET" });
+    if (isApiError(data)) {
+      setLoadState("error");
+      pushRow(applyDefaults(cid));
+      return;
+    }
     const row = parseSettings(data);
     if (!row) {
       setLoadState("error");
@@ -238,6 +237,18 @@ export default function SettingsUI() {
   useEffect(() => {
     void load();
     // mount-only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const onChannelChanged = () => {
+      void load();
+    };
+
+    window.addEventListener(CHANNEL_CHANGED_EVENT, onChannelChanged);
+    return () => {
+      window.removeEventListener(CHANNEL_CHANGED_EVENT, onChannelChanged);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -258,7 +269,9 @@ export default function SettingsUI() {
         method: "PUT",
         rawBody: true,
       });
-      if (data && typeof data === "object" && "error" in data) return;
+      if (isApiError(data) || isApiFailure(data as { success?: boolean })) {
+        return;
+      }
       const row = parseSettings(data);
       if (row) pushRow(row);
       else setBaseline(payload);

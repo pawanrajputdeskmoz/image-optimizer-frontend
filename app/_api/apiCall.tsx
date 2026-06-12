@@ -1,3 +1,4 @@
+import { readChannelId } from "@/app/_lib/channelStorage";
 import { toast } from "sonner";
 
 function getStoredApiToken(): string {
@@ -10,26 +11,6 @@ function getStoredApiToken(): string {
     localStorage.getItem("token")?.trim() ||
     ""
   );
-}
-
-function getStoredChannelId(): number {
-  if (typeof window === "undefined") {
-    return 1;
-  }
-  try {
-    const raw = localStorage.getItem("channel");
-    if (!raw) return 1;
-    const parsed = JSON.parse(raw) as { channel_id?: number | string };
-    const id = parsed?.channel_id;
-    if (typeof id === "number") return id;
-    if (typeof id === "string" && id.trim() !== "") {
-      const n = Number(id);
-      return Number.isFinite(n) ? n : 1;
-    }
-    return 1;
-  } catch {
-    return 1;
-  }
 }
 
 function showApiErrorToast(status: number, message?: string) {
@@ -82,12 +63,37 @@ export async function ApiCall(
     const path = url.replace(/^\//, "");
     let fetchUrl = `${base}/api/${path}`;
 
-    if (opts?.query) {
+    const mergedQuery: Record<string, string | number | boolean | null | undefined> =
+      {
+        ...(opts?.query ?? {}),
+      };
+
+    const skipDefaultGetContext = path === "settings/channels";
+
+    if (
+      method === "GET" &&
+      typeof window !== "undefined" &&
+      !skipDefaultGetContext
+    ) {
+      const shop = localStorage.getItem("shop");
+      if (shop && mergedQuery.shop == null) {
+        mergedQuery.shop = shop;
+      }
+      if (mergedQuery.channel_id == null) {
+        mergedQuery.channel_id = readChannelId();
+      }
+      const storeId = localStorage.getItem("user_id");
+      if (storeId && mergedQuery.store_id == null) {
+        mergedQuery.store_id = storeId;
+      }
+    }
+
+    const queryEntries = Object.entries(mergedQuery).filter(
+      ([, value]) => value != null && value !== "",
+    );
+    if (queryEntries.length > 0) {
       const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(opts.query)) {
-        if (value == null || value === "") {
-          continue;
-        }
+      for (const [key, value] of queryEntries) {
         params.set(key, String(value));
       }
       const qs = params.toString();
@@ -102,7 +108,7 @@ export async function ApiCall(
       if (rawBody) {
         init.body = JSON.stringify(body ?? {});
       } else {
-        const channelId = getStoredChannelId();
+        const channelId = readChannelId();
         const payload: Record<string, unknown> = {
           ...(body as Record<string, unknown>),
           shop:

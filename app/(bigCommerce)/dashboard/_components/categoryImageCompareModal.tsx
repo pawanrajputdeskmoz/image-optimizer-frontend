@@ -3,35 +3,17 @@
 import ImageComparePopup from "@/app/_components/imagePreview";
 import { useCallback, useEffect, useState } from "react";
 import { isApiError } from "../_lib/apiUtils";
-import { fetchPreviewImageData } from "../_lib/imageOptimizerApi";
-import { storageFilePathToPublicUrl } from "../_lib/previewFiles";
-import type { ImageItem, PreviewImageData } from "../types";
+import { fetchCategoryPreviewImageData } from "../_lib/imageOptimizerApi";
+import type { Category, CategoryPreviewImageData } from "../types";
 
-function formatBytesLabel(bytes?: number): string | null {
+function formatBytesLabel(bytes?: number | null): string {
   if (typeof bytes !== "number" || !Number.isFinite(bytes)) {
-    return null;
+    return "—";
   }
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-function resolveSizeLabel(
-  ...sources: (number | string | undefined)[]
-): string {
-  for (const source of sources) {
-    if (typeof source === "number") {
-      const label = formatBytesLabel(source);
-      if (label) {
-        return label;
-      }
-    }
-    if (typeof source === "string" && source.trim()) {
-      return source.trim();
-    }
-  }
-  return "—";
-}
-
-function parsePreviewPayload(preview: PreviewImageData | undefined): {
+function parseCategoryPreviewPayload(preview: CategoryPreviewImageData | undefined): {
   originalUrl: string;
   optimizedUrl: string;
   originalSizeLabel: string;
@@ -41,8 +23,8 @@ function parsePreviewPayload(preview: PreviewImageData | undefined): {
     return null;
   }
 
-  const originalUrl = storageFilePathToPublicUrl(preview.files?.original);
-  const optimizedUrl = storageFilePathToPublicUrl(preview.files?.optimized);
+  const originalUrl = preview.imageData?.original_url?.trim() ?? "";
+  const optimizedUrl = preview.imageData?.optimized_url?.trim() ?? "";
 
   if (!originalUrl || !optimizedUrl) {
     return null;
@@ -51,24 +33,22 @@ function parsePreviewPayload(preview: PreviewImageData | undefined): {
   return {
     originalUrl,
     optimizedUrl,
-    originalSizeLabel: resolveSizeLabel(preview.oldData?.original?.size),
-    optimizedSizeLabel: resolveSizeLabel(preview.oldData?.optimized?.size),
+    originalSizeLabel: formatBytesLabel(preview.imageData?.original?.size),
+    optimizedSizeLabel: formatBytesLabel(preview.imageData?.optimized?.size),
   };
 }
 
-type ImageCompareModalProps = {
+type CategoryImageCompareModalProps = {
   open: boolean;
   onClose: () => void;
-  productId: number;
-  image: ImageItem;
+  category: Category | null;
 };
 
-export default function ImageCompareModal({
+export default function CategoryImageCompareModal({
   open,
   onClose,
-  productId,
-  image,
-}: ImageCompareModalProps) {
+  category,
+}: CategoryImageCompareModalProps) {
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [optimizedUrl, setOptimizedUrl] = useState<string | null>(null);
   const [originalSizeLabel, setOriginalSizeLabel] = useState("—");
@@ -77,20 +57,33 @@ export default function ImageCompareModal({
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadPreview = useCallback(async () => {
+    if (!category) {
+      return;
+    }
+
     setIsLoading(true);
     setFetchError(null);
     setOriginalUrl(null);
     setOptimizedUrl(null);
 
     try {
-      const response = await fetchPreviewImageData(productId, image);
+      const response = await fetchCategoryPreviewImageData({
+        categoryId: category.id,
+      });
 
-      if (isApiError(response) || response?.success === false) {
-        setFetchError("Could not load preview images.");
+      if (isApiError(response)) {
+        setFetchError("Could not load category preview images.");
         return;
       }
 
-      const parsed = parsePreviewPayload(response?.data);
+      if (response?.success === false) {
+        setFetchError(
+          response.message || "Could not load category preview images.",
+        );
+        return;
+      }
+
+      const parsed = parseCategoryPreviewPayload(response?.data);
 
       if (!parsed) {
         setFetchError("Preview files are not available for comparison.");
@@ -102,23 +95,23 @@ export default function ImageCompareModal({
       setOriginalSizeLabel(parsed.originalSizeLabel);
       setOptimizedSizeLabel(parsed.optimizedSizeLabel);
     } catch {
-      setFetchError("Could not load preview images.");
+      setFetchError("Could not load category preview images.");
     } finally {
       setIsLoading(false);
     }
-  }, [productId, image]);
+  }, [category]);
 
   useEffect(() => {
-    if (open) {
+    if (open && category) {
       void loadPreview();
     } else {
       setOriginalUrl(null);
       setOptimizedUrl(null);
       setFetchError(null);
     }
-  }, [open, loadPreview]);
+  }, [open, category, loadPreview]);
 
-  if (!open) {
+  if (!open || !category) {
     return null;
   }
 

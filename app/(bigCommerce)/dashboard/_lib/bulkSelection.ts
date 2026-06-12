@@ -1,24 +1,5 @@
+import { readChannelId } from "@/app/_lib/channelStorage";
 import type { ImageActionPayload, ImageItem } from "../types";
-
-function readChannelId(): number {
-  if (typeof window === "undefined") {
-    return 1;
-  }
-  try {
-    const raw = localStorage.getItem("channel");
-    if (!raw) return 1;
-    const parsed = JSON.parse(raw) as { channel_id?: number | string };
-    const id = parsed?.channel_id;
-    if (typeof id === "number") return id;
-    if (typeof id === "string" && id.trim() !== "") {
-      const n = Number(id);
-      return Number.isFinite(n) ? n : 1;
-    }
-    return 1;
-  } catch {
-    return 1;
-  }
-}
 
 export function buildImageActionPayload(
   productId: number,
