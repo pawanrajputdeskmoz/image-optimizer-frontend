@@ -12,15 +12,17 @@ import {
 import { formatBytesToKb } from "../_lib/productMappers";
 import {
   bulkOptimizeCategoryImages,
+  bulkRestoreCategoryImages,
   fetchCategoryList,
   optimizeCategoryImage,
   restoreCategoryImage,
 } from "../_lib/imageOptimizerApi";
 import type { Category, CategoryBulkOptimizeItem, ContextualImage } from "../types";
 import CategoryImageCompareModal from "./categoryImageCompareModal";
+import ListingPagination from "./listingPagination";
 import ContextualImageRow from "./contextualImageRow";
 
-const CATEGORIES_PER_PAGE = 50;
+const CATEGORY_PER_PAGE_OPTIONS = [5, 10, 50] as const;
 
 type CategoryImageListingProps = {
   refreshNonce?: number;
@@ -43,6 +45,7 @@ export default function CategoryImageListing({
 }: CategoryImageListingProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState<number>(50);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +57,11 @@ export default function CategoryImageListing({
   const [restoringKeys, setRestoringKeys] = useState<Record<string, true>>({});
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isBulkOptimizing, setIsBulkOptimizing] = useState(false);
+  const [isBulkRestoring, setIsBulkRestoring] = useState(false);
 
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
 
-  const loadCategories = useCallback(async (page: number) => {
+  const loadCategories = useCallback(async (page: number, limit: number) => {
     setIsLoading(true);
     setError(null);
     setMessage(null);
@@ -72,7 +76,7 @@ export default function CategoryImageListing({
       const response = await fetchCategoryList({
         storeHash,
         page,
-        limit: CATEGORIES_PER_PAGE,
+        limit,
       });
 
       if (isApiError(response)) {
@@ -102,8 +106,8 @@ export default function CategoryImageListing({
   }, []);
 
   useEffect(() => {
-    void loadCategories(currentPage);
-  }, [loadCategories, currentPage, refreshNonce]);
+    void loadCategories(currentPage, perPage);
+  }, [loadCategories, currentPage, perPage, refreshNonce]);
 
   const handlePreview = useCallback(
     (image: ContextualImage) => {
@@ -255,13 +259,29 @@ export default function CategoryImageListing({
     [categories],
   );
 
-  // A category is eligible for bulk optimize if it has an image and is not yet optimized
-  const bulkEligible = categories.filter(
+  // Eligible for bulk optimize: has image, not yet optimized
+  const bulkOptimizeEligible = categories.filter(
     (c) => c.canOptimize && c.hasImage && !c.isOptimized,
+  );
+  // Eligible for bulk restore: already optimized
+  const bulkRestoreEligible = categories.filter(
+    (c) => c.isOptimized && c.hasImage,
+  );
+  // "Select all" covers the union of both sets
+  const bulkEligible = categories.filter(
+    (c) => (c.canOptimize && c.hasImage && !c.isOptimized) || (c.isOptimized && c.hasImage),
   );
   const allEligibleSelected =
     bulkEligible.length > 0 &&
     bulkEligible.every((c) => selectedIds.has(c.id));
+
+  // From selected rows, how many qualify for each action
+  const selectedOptimizeCount = bulkOptimizeEligible.filter((c) =>
+    selectedIds.has(c.id),
+  ).length;
+  const selectedRestoreCount = bulkRestoreEligible.filter((c) =>
+    selectedIds.has(c.id),
+  ).length;
 
   const handleSelectRow = useCallback(
     (image: ContextualImage, checked: boolean) => {
@@ -339,7 +359,7 @@ export default function CategoryImageListing({
       setSelectedIds(new Set());
 
       // Reload the page to reflect updated statuses from the server
-      void loadCategories(currentPage);
+      void loadCategories(currentPage, perPage);
     } catch (err) {
       setError(
         err instanceof Error
@@ -349,16 +369,84 @@ export default function CategoryImageListing({
     } finally {
       setIsBulkOptimizing(false);
     }
-  }, [categories, selectedIds, currentPage, loadCategories]);
+  }, [categories, selectedIds, currentPage, perPage, loadCategories]);
+
+  const handleBulkRestore = useCallback(async () => {
+    // Only send categories that are selected AND already optimized (have an optimized image)
+    const items: CategoryBulkOptimizeItem[] = categories
+      .filter(
+        (c) =>
+          selectedIds.has(c.id) &&
+          c.isOptimized &&
+          c.imageUrl.trim(),
+      )
+      .map((c) => ({
+        category_id: c.id,
+        image_url: c.optimizedUrl ?? c.imageUrl,
+        category_name: c.name,
+        tree_id: c.treeId,
+      }));
+
+    if (items.length === 0) {
+      setError("No optimized categories selected for restore.");
+      return;
+    }
+
+    setIsBulkRestoring(true);
+    setError(null);
+
+    try {
+      const response = await bulkRestoreCategoryImages(items);
+
+      if (isApiError(response)) {
+        setError("Bulk restore failed.");
+        return;
+      }
+
+      if (isApiFailure(response)) {
+        setError(response.message || "Bulk restore failed.");
+        return;
+      }
+
+      if (response.success !== true) {
+        setError(response.message || "Bulk restore failed.");
+        return;
+      }
+
+      const queued = response.data?.queued_categories ?? items.length;
+      setMessage(
+        response.message ??
+          `${queued} categor${queued === 1 ? "y" : "ies"} queued for restore.`,
+      );
+      setSelectedIds(new Set());
+      void loadCategories(currentPage, perPage);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong during bulk restore.",
+      );
+    } finally {
+      setIsBulkRestoring(false);
+    }
+  }, [categories, selectedIds, currentPage, perPage, loadCategories]);
 
   const goToPage = useCallback((page: number) => {
     setCurrentPage(Math.max(1, page));
   }, []);
 
+  const handlePerPageChange = useCallback((nextPerPage: number) => {
+    setPerPage(nextPerPage);
+    setCurrentPage(1);
+  }, []);
+
   const rows = categories.map((category) => ({
     image: mapCategoryToContextualImage(category),
     canOptimize: category.canOptimize,
-    isEligibleForBulk: category.canOptimize && category.hasImage && !category.isOptimized,
+    // Eligible for any bulk action: can optimize OR can restore
+    isEligibleForBulk:
+      (category.canOptimize && category.hasImage && !category.isOptimized) ||
+      (category.isOptimized && category.hasImage),
   }));
 
   if (isLoading && categories.length === 0) {
@@ -392,7 +480,7 @@ export default function CategoryImageListing({
       <div className="rounded-xl border bg-white">
         {/* Bulk-action toolbar */}
         {bulkEligible.length > 0 ? (
-          <div className="flex items-center gap-3 border-b px-4 py-2">
+          <div className="flex flex-wrap items-center gap-3 border-b px-4 py-2">
             <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
               <input
                 type="checkbox"
@@ -404,16 +492,33 @@ export default function CategoryImageListing({
             </label>
 
             {selectedIds.size > 0 ? (
-              <button
-                type="button"
-                disabled={isBulkOptimizing}
-                onClick={handleBulkOptimize}
-                className="ml-auto rounded bg-black px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isBulkOptimizing
-                  ? "Optimizing…"
-                  : `Optimize selected (${selectedIds.size})`}
-              </button>
+              <div className="ml-auto flex gap-2">
+                {selectedOptimizeCount > 0 ? (
+                  <button
+                    type="button"
+                    disabled={isBulkOptimizing}
+                    onClick={handleBulkOptimize}
+                    className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isBulkOptimizing
+                      ? "Optimizing…"
+                      : `Optimize (${selectedOptimizeCount})`}
+                  </button>
+                ) : null}
+
+                {selectedRestoreCount > 0 ? (
+                  <button
+                    type="button"
+                    disabled={isBulkRestoring}
+                    onClick={handleBulkRestore}
+                    className="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isBulkRestoring
+                      ? "Restoring…"
+                      : `Restore (${selectedRestoreCount})`}
+                  </button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -443,31 +548,16 @@ export default function CategoryImageListing({
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-600">
-          Page {safeCurrentPage} of {totalPages}
-        </span>
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => goToPage(safeCurrentPage - 1)}
-            disabled={safeCurrentPage === 1 || isLoading}
-            className="rounded border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Prev
-          </button>
-
-          <button
-            type="button"
-            onClick={() => goToPage(safeCurrentPage + 1)}
-            disabled={safeCurrentPage === totalPages || isLoading}
-            className="rounded border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      </div>
+      <ListingPagination
+        currentPage={safeCurrentPage}
+        totalPages={totalPages}
+        onPageChange={goToPage}
+        disabled={isLoading}
+        perPage={perPage}
+        perPageOptions={[...CATEGORY_PER_PAGE_OPTIONS]}
+        onPerPageChange={handlePerPageChange}
+        perPageLabel="Items per page"
+      />
 
       <CategoryImageCompareModal
         open={previewCategory !== null}

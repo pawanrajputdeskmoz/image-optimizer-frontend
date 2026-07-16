@@ -3,8 +3,11 @@
 import { ApiCall } from "@/app/_api/apiCall";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
-import { storageFilePathToPublicUrl } from "../_lib/previewFiles";
+import { parseProductPreviewData } from "../_lib/previewMappers";
 import type { PreviewImageApiResponse } from "../types";
+import PreviewComparisonPanel, {
+  type PreviewComparisonRow,
+} from "./previewComparisonPanel";
 
 type PreviewModalImage = {
   product_id: number;
@@ -20,33 +23,6 @@ type PreviewModalProps = {
   RestoreOptimizeImage: () => void;
   size: string;
 };
-
-type OldPreviewData = {
-  image: string;
-  name: string;
-  size: string;
-  altText: string;
-};
-
-type LegacyPreviewResponse = {
-  data?: {
-    image_url?: string;
-    old_file_name?: string;
-    image_size?: string;
-    old_alt_text?: string;
-    files?: { original?: string | null };
-    oldData?: {
-      imageName?: string;
-      altText?: string;
-      original?: { size?: number };
-    };
-  };
-};
-
-function readStoredShop(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("shop") ?? "";
-}
 
 function LoadingSpinner() {
   return (
@@ -64,13 +40,11 @@ export default function PreviewModal({
   RestoreOptimizeImage,
   size,
 }: PreviewModalProps) {
-  const [oldData, setOldData] = useState<OldPreviewData>({
-    image: "",
-    name: "",
-    size: "",
-    altText: "",
-  });
-  const [shop] = useState(readStoredShop);
+  const [originalUrl, setOriginalUrl] = useState("");
+  const [optimizedUrl, setOptimizedUrl] = useState("");
+  const [comparisonRows, setComparisonRows] = useState<PreviewComparisonRow[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
 
   const loadPreview = useCallback(async () => {
@@ -80,25 +54,52 @@ export default function PreviewModal({
         product_id: image.product_id,
         image_id: image.id,
       });
-      const response = raw as PreviewImageApiResponse & LegacyPreviewResponse;
-      const data = response.data;
-      setOldData({
-        image:
-          data?.image_url ??
-          storageFilePathToPublicUrl(data?.files?.original) ??
-          "",
-        name: data?.old_file_name ?? data?.oldData?.imageName ?? "",
-        size:
-          data?.image_size ??
-          (typeof data?.oldData?.original?.size === "number"
-            ? `${(data.oldData.original.size / 1024).toFixed(1)} KB`
-            : ""),
-        altText: data?.old_alt_text ?? data?.oldData?.altText ?? "",
-      });
+      const response = raw as PreviewImageApiResponse;
+      const parsed = parseProductPreviewData(response.data);
+
+      if (parsed) {
+        setOriginalUrl(parsed.originalUrl);
+        setOptimizedUrl(parsed.optimizedUrl);
+        setComparisonRows([
+          {
+            label: "Name",
+            before: parsed.oldName,
+            after: parsed.newName,
+          },
+          {
+            label: "Alt",
+            before: parsed.oldAltText,
+            after: parsed.newAltText,
+          },
+          {
+            label: "Size",
+            before: parsed.oldSizeLabel,
+            after: parsed.newSizeLabel,
+            savedPercentage: parsed.savedPercentage,
+          },
+        ]);
+        return;
+      }
+
+      setOriginalUrl("");
+      setOptimizedUrl("");
+      setComparisonRows([
+        {
+          label: "Name",
+          before: "—",
+          after: image.image_file.split("/").pop() ?? "—",
+        },
+        {
+          label: "Alt",
+          before: "—",
+          after: image.description || "—",
+        },
+        { label: "Size", before: "—", after: size },
+      ]);
     } finally {
       setLoading(false);
     }
-  }, [image.product_id, image.id]);
+  }, [image.product_id, image.id, image.image_file, image.description, size]);
 
   useEffect(() => {
     if (show) {
@@ -110,10 +111,6 @@ export default function PreviewModal({
     return null;
   }
 
-  const optimizedSrc = shop
-    ? `https://store-${shop}.mybigcommerce.com/product_images/${image.image_file}`
-    : "";
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -121,94 +118,77 @@ export default function PreviewModal({
       role="presentation"
     >
       <div
-        className="relative w-full max-w-4xl rounded-xl bg-white shadow-xl"
+        className="relative w-full max-w-xl rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="preview-modal-title"
       >
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h1 id="preview-modal-title" className="text-lg font-semibold">
+        <div className="flex items-center justify-between border-b px-3 py-2">
+          <h1 id="preview-modal-title" className="text-sm font-semibold">
             Optimize Preview
           </h1>
           <button
             type="button"
             onClick={onHide}
-            className="text-gray-500 hover:text-black"
+            className="text-gray-400 hover:text-gray-700"
             aria-label="Close"
           >
             ✕
           </button>
         </div>
 
-        <div className="p-4">
-          <div className="optimizePreview-modalArea grid grid-cols-2 gap-4">
-            <div className="optimizePreview-left border-r pr-4 text-center">
-              <h2 className="mb-3 text-base font-semibold">Old</h2>
-              <div className="OptimizeModal-Image flex min-h-[210px] items-center justify-center">
+        <div className="p-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center">
+              <p className="mb-1 text-[10px] font-medium uppercase text-gray-400">
+                Old
+              </p>
+              <div className="flex h-[140px] items-center justify-center">
                 {loading ? (
                   <LoadingSpinner />
-                ) : oldData.image ? (
+                ) : originalUrl ? (
                   <Image
-                    src={oldData.image}
-                    width={210}
-                    height={210}
+                    src={originalUrl}
+                    width={140}
+                    height={140}
                     alt="Original preview"
+                    className="max-h-[140px] w-auto object-contain"
                     unoptimized
                   />
                 ) : null}
               </div>
-              <ul className="mt-3 space-y-1 text-left text-sm">
-                <li>
-                  <span className="font-medium">Name: </span>
-                  {loading ? <LoadingSpinner /> : oldData.name}
-                </li>
-                <li>
-                  <span className="font-medium">Size: </span>
-                  {loading ? <LoadingSpinner /> : oldData.size}
-                </li>
-                <li>
-                  <span className="font-medium">Alt Text: </span>
-                  {loading ? <LoadingSpinner /> : oldData.altText}
-                </li>
-              </ul>
             </div>
-
-            <div className="optimizePreview-left pl-4 text-center">
-              <h2 className="mb-3 text-base font-semibold">New</h2>
-              <div className="OptimizeModal-Image flex min-h-[210px] items-center justify-center">
-                {optimizedSrc ? (
+            <div className="text-center">
+              <p className="mb-1 text-[10px] font-medium uppercase text-gray-400">
+                New
+              </p>
+              <div className="flex h-[140px] items-center justify-center">
+                {loading ? (
+                  <LoadingSpinner />
+                ) : optimizedUrl ? (
                   <Image
-                    src={optimizedSrc}
-                    width={210}
-                    height={210}
+                    src={optimizedUrl}
+                    width={140}
+                    height={140}
                     alt="Optimized preview"
+                    className="max-h-[140px] w-auto object-contain"
                     unoptimized
                   />
                 ) : null}
               </div>
-              <ul className="mt-3 space-y-1 text-left text-sm">
-                <li>
-                  <span className="font-medium">Name: </span>
-                  {image.image_file.split("/").pop()}
-                </li>
-                <li>
-                  <span className="font-medium">Size: </span>
-                  {size}
-                </li>
-                <li>
-                  <span className="font-medium">Alt Text: </span>
-                  {image.description}
-                </li>
-              </ul>
             </div>
+          </div>
+
+          <div className="mt-2">
+            <PreviewComparisonPanel rows={comparisonRows} loading={loading} />
           </div>
         </div>
 
-        <div className="flex justify-end border-t px-4 py-3">
+        <div className="flex justify-end border-t px-3 py-2">
           <button
             type="button"
-            className="custom-btn rounded bg-black px-4 py-2 text-sm text-white"
+            className="rounded bg-black px-3 py-1.5 text-xs text-white hover:bg-gray-900"
             onClick={() => {
               RestoreOptimizeImage();
               onHide();

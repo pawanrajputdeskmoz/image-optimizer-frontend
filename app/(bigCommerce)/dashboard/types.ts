@@ -14,7 +14,7 @@ export type ImageItem = {
   sortOrder?: number;
 };
 
-export type ImageListType = "product" | "categories" | "brand" | "home";
+export type ImageListType = "product" | "categories" | "brand";
 
 export type Product = {
   id: number;
@@ -88,9 +88,11 @@ export type OptimizationImageMeta = {
 
 export type SingleImageOptimizationResponse = {
   success?: boolean;
+  skipped?: boolean;
   message?: string;
   data?: {
     status?: string;
+    skip_reason?: string;
     old_image_id?: string | number;
     new_image_id?: number;
     new_image_url?: string;
@@ -110,21 +112,52 @@ export type SingleImageOptimizationResponse = {
 export type PreviewOldData = {
   imageName?: string;
   altText?: string;
+  newImageName?: string;
+  newAltText?: string;
   original?: OptimizedImageMetrics;
   optimized?: OptimizedImageMetrics;
   saved_bytes?: number;
   saved_percentage?: number;
 };
 
+export type PreviewImageMeta = {
+  name?: string;
+  alt_text?: string;
+  size?: number | null;
+  width?: number | null;
+  height?: number | null;
+  format?: string | null;
+  file_path?: string | null;
+};
+
 export type PreviewImageData = {
   image_id?: number;
   product_id?: number;
+  old?: PreviewImageMeta;
+  new?: PreviewImageMeta;
+  comparison?: {
+    name?: { old?: string; new?: string };
+    alt_text?: { old?: string; new?: string };
+    size?: {
+      old?: number | null;
+      new?: number | null;
+      saved_bytes?: number | null;
+      saved_percentage?: number | null;
+    };
+  };
+  saved_bytes?: number | null;
+  saved_percentage?: number | null;
   optimization?: Record<string, unknown>;
   oldData?: PreviewOldData | null;
   files?: {
     original?: string | null;
     optimized?: string | null;
   };
+  /** @deprecated legacy preview fields */
+  image_url?: string;
+  old_file_name?: string;
+  image_size?: string;
+  old_alt_text?: string;
 };
 
 export type PreviewImageApiResponse = {
@@ -203,7 +236,7 @@ export type StandardApiResponse = {
   error?: string;
 };
 
-/** Flat listing images from home, categories, brand, etc. */
+/** Flat listing images from categories, brand, etc. */
 export type ContextualImage = {
   key: string;
   id: string | null;
@@ -351,6 +384,85 @@ export type CategoryBulkOptimizeResponse = {
   error?: string;
 };
 
+export type CategoryBulkRestoreResultData = {
+  job_uuid?: string;
+  job_type?: string;
+  queue?: string;
+  total_categories?: number;
+  queued_categories?: number;
+  skipped_categories?: number;
+  job?: unknown;
+  jobs?: unknown[];
+  skipped?: unknown[];
+};
+
+export type CategoryBulkRestoreResponse = {
+  success?: boolean;
+  message?: string;
+  data?: CategoryBulkRestoreResultData;
+  error?: string;
+};
+
+export type BulkRestoreAllCategoriesResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    queued?: number;
+    skipped?: number;
+    total?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
+export type BulkRestoreAllProductsResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    queued?: number;
+    skipped?: number;
+    total?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
+export type BulkRestoreAllBrandsResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    queued?: number;
+    skipped?: number;
+    total?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
+export type BulkOptimizeAllCategoriesResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    queued?: number;
+    skipped?: number;
+    total?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
+export type BulkOptimizeAllBrandsResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    queued?: number;
+    skipped?: number;
+    total?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
 export type CategoryRestoreResultData = {
   category_id?: number;
   channel_id?: number;
@@ -422,38 +534,232 @@ export type CategoriesApiResponse = {
   error?: string;
 };
 
-export type HomeImagesApiResponse = {
+export type ApiBrand = {
+  id: number;
+  name: string;
+  page_title?: string;
+  image_url?: string | null;
+  custom_url?: { url?: string; is_customized?: boolean } | null;
+  has_image?: boolean;
+  storefront_url?: string | null;
+  optimization_status?: string;
+  image_update_status?: string;
+  size?: ApiImageSize;
+};
+
+export type Brand = {
+  id: number;
+  name: string;
+  imageUrl: string;
+  optimizedUrl: string | null;
+  hasImage: boolean;
+  storefrontUrl: string | null;
+  optimizationStatus: string;
+  imageUpdateStatus: string;
+  sizeLabel: string;
+  isOptimized: boolean;
+};
+
+export type BrandsApiResponse = {
   success?: boolean;
   message?: string;
-  count?: number;
-  sources?: Record<string, number>;
-  errors?: string[];
-  data?: ApiContextualImage[];
+  data?: ApiBrand[];
+  pagination?: {
+    total_pages?: number;
+    current_page?: number;
+    total?: number;
+    count?: number;
+    per_page?: number;
+  };
   error?: string;
 };
 
-export const HOME_IMAGE_SOURCE_TYPES = [
-  "widget",
-  "content_page",
-  "storefront_html",
-] as const;
-
-export type HomeImageSourceType = (typeof HOME_IMAGE_SOURCE_TYPES)[number];
-
-export type HomeImageOptimizePayload = {
+export type BrandOptimizePayload = {
   channel_id: number;
-  source_type: HomeImageSourceType;
-  source_key: string;
-  original_url: string;
+  brand_id: number;
+  image_url: string;
+  brand_name: string;
+  optimization_status?: string;
 };
 
-export type HomeBannerOptimizeResponse = {
+export type BrandOptimizeResultData = {
+  brand_id?: number;
+  brand_name?: string | null;
+  image_url?: string;
+  old_image_url?: string;
+  new_image_url?: string;
+  optimized_url?: string | null;
+  status?: string;
+  optimization_status?: string;
+  optimized_size?: number | null;
+  error_message?: string | null;
+  optimizedImage?: {
+    original?: OptimizedImageMetrics;
+    optimized?: OptimizedImageMetrics;
+    compression?: {
+      savedBytes?: number;
+      savedPercent?: number;
+    };
+  };
+};
+
+export type BrandOptimizeResponse = {
+  success?: boolean;
+  skipped?: boolean;
+  message?: string;
+  data?: BrandOptimizeResultData;
+  error?: string;
+};
+
+export type BrandBulkOptimizeItem = {
+  brand_id: number;
+  image_url: string;
+  brand_name: string;
+  optimization_status?: string;
+};
+
+export type BrandBulkOptimizePayload = {
+  store_hash: string;
+  brands: BrandBulkOptimizeItem[];
+};
+
+export type BrandBulkOptimizeResponse = {
   success?: boolean;
   message?: string;
   data?: {
-    status?: string;
+    queued?: number;
+    skipped?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
+export type BrandBulkRestoreResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    queued?: number;
+    skipped?: number;
+    job_uuid?: string;
+  };
+  error?: string;
+};
+
+export type BrandRestoreResultData = {
+  brand_id?: number;
+  channel_id?: number;
+  brand_name?: string;
+  restored_image_url?: string;
+  original_url?: string;
+  verified?: boolean;
+  original_size?: number;
+  original_width?: number;
+  original_height?: number;
+  original_format?: string;
+  status?: string;
+  message?: string;
+};
+
+export type BrandRestoreResponse = {
+  success?: boolean;
+  message?: string;
+  data?: BrandRestoreResultData;
+  error?: string;
+};
+
+export type BrandPreviewImageData = {
+  brand_id?: number;
+  brand_name?: string;
+  channel_id?: number;
+  status?: {
     optimization_status?: string;
+    image_update_status?: string;
+    optimization_started_at?: string;
+    optimized_at?: string;
+  };
+  imageData?: {
+    original?: OptimizedImageMetrics;
+    optimized?: OptimizedImageMetrics;
+    saved_bytes?: number;
+    saved_percentage?: number;
+    original_url?: string;
     optimized_url?: string;
+  };
+  files?: {
+    original?: string | null;
+    optimized?: string | null;
+  };
+};
+
+export type BrandPreviewImageApiResponse = {
+  success?: boolean;
+  data?: BrandPreviewImageData;
+  message?: string;
+  error?: string;
+};
+
+export type DashboardStatCard = {
+  value: number;
+  display: string;
+  subtitle: string;
+};
+
+export type ClientDashboardStatsData = {
+  pending_images: DashboardStatCard;
+  pending_restore_images?: DashboardStatCard;
+  pending_mode?: "optimize" | "restore";
+  optimized_images: DashboardStatCard;
+  total_data_saved: DashboardStatCard;
+  image_quota: {
+    percent: number;
+    display: string;
+    used: number;
+    limit: number;
+    plan: string;
+    subtitle: string;
+  };
+  active_job?: boolean;
+  failed_images?: number;
+  average_saving_percent?: number;
+  last_optimized_at?: string | null;
+};
+
+export type ClientDashboardStatsResponse = {
+  success?: boolean;
+  message?: string;
+  data?: ClientDashboardStatsData;
+  error?: string;
+};
+
+export type MerchantPlan = {
+  slug: string;
+  name: string;
+  description: string | null;
+  price: number;
+  currency: string;
+  monthly_image_limit: number | null;
+  is_active: boolean;
+  display_order: number;
+};
+
+export type MerchantPlansResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    plans?: MerchantPlan[];
+    selected_plan?: string;
+    effective_plan?: MerchantPlan | null;
+    client_plan?: Record<string, unknown> | null;
+  };
+  error?: string;
+};
+
+export type SelectPlanResponse = {
+  success?: boolean;
+  message?: string;
+  data?: {
+    selected_plan?: string;
+    plan?: MerchantPlan;
   };
   error?: string;
 };

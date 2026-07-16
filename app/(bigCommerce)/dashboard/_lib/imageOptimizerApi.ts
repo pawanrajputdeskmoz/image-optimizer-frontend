@@ -1,21 +1,35 @@
 import { ApiCall } from "@/app/_api/apiCall";
 import type { ImageActionPayload, ImageItem } from "../types";
 import { buildImageActionPayload } from "./bulkSelection";
+import { buildBrandOptimizePayload } from "./brandOptimize";
 import { buildCategoryOptimizePayload } from "./categoryOptimize";
-import { buildHomeImageOptimizePayload } from "./homeImageOptimize";
 import type {
+  Brand,
+  BrandBulkOptimizeItem,
+  BrandBulkOptimizeResponse,
+  BrandBulkRestoreResponse,
+  BrandOptimizeResponse,
+  BrandPreviewImageApiResponse,
+  BrandRestoreResponse,
+  BrandsApiResponse,
   BulkImageOptimizationResponse,
+  BulkOptimizeAllBrandsResponse,
+  BulkOptimizeAllCategoriesResponse,
+  BulkRestoreAllBrandsResponse,
+  BulkRestoreAllCategoriesResponse,
+  BulkRestoreAllProductsResponse,
   BulkRestoreResponse,
   CategoriesApiResponse,
   Category,
   CategoryBulkOptimizeItem,
   CategoryBulkOptimizeResponse,
+  CategoryBulkRestoreResponse,
   CategoryOptimizeResponse,
   CategoryPreviewImageApiResponse,
   CategoryRestoreResponse,
-  ContextualImage,
-  HomeBannerOptimizeResponse,
-  HomeImagesApiResponse,
+  ClientDashboardStatsResponse,
+  MerchantPlansResponse,
+  SelectPlanResponse,
   ImageListType,
   PreviewImageApiResponse,
   ProductApiResponse,
@@ -41,19 +55,20 @@ export async function fetchProductList(params: {
   search?: string;
   listType?: ImageListType;
 }) {
-  const body = {
+  const trimmedSearch = params.search?.trim();
+  const body: Record<string, string | number> = {
     store_hash: params.storeHash,
     page: params.page,
     limit: params.limit,
   };
 
+  if (trimmedSearch) {
+    body.search = trimmedSearch;
+  }
+
   const query: Record<string, string> = {
     type: params.listType ?? "product",
   };
-
-  if (params.search?.trim()) {
-    query.search = params.search.trim();
-  }
 
   return ApiCall("image-optimizer/get-all-products", body, {
     query,
@@ -98,6 +113,13 @@ export async function bulkRestoreImages(payload: ImageActionPayload[]) {
   }) as Promise<BulkRestoreResponse>;
 }
 
+export async function bulkRestoreAllImages() {
+  return ApiCall(
+    "image-optimizer/bulk-restore-all",
+    {},
+  ) as Promise<BulkRestoreAllProductsResponse>;
+}
+
 export async function updateImageAltText(params: {
   imageId: number;
   productId: number;
@@ -135,6 +157,59 @@ export async function fetchCategoryList(params: {
   }) as Promise<CategoriesApiResponse>;
 }
 
+export async function fetchBrandList(params: {
+  page: number;
+  limit: number;
+}) {
+  return ApiCall("brand-images/get-all-brands", {
+    page: params.page,
+    limit: params.limit,
+  }) as Promise<BrandsApiResponse>;
+}
+
+export async function optimizeBrandImage(
+  brand: Pick<Brand, "id" | "name" | "imageUrl" | "optimizationStatus">,
+) {
+  const payload = buildBrandOptimizePayload(brand);
+
+  return ApiCall(
+    "brand-images/optimize-brand",
+    payload,
+  ) as Promise<BrandOptimizeResponse>;
+}
+
+export async function restoreBrandImage(brand: Pick<Brand, "id">) {
+  return ApiCall("brand-images/restore-brand", {
+    brand_id: brand.id,
+  }) as Promise<BrandRestoreResponse>;
+}
+
+export async function bulkOptimizeBrandImages(
+  items: BrandBulkOptimizeItem[],
+  storeHash: string,
+) {
+  return ApiCall("brand-images/bulk-optimize-brands-checkbox", {
+    store_hash: storeHash,
+    brands: items,
+  }) as Promise<BrandBulkOptimizeResponse>;
+}
+
+export async function bulkRestoreBrandImages(
+  items: BrandBulkOptimizeItem[],
+  storeHash: string,
+) {
+  return ApiCall("brand-images/bulk-restore-brands-checkbox", {
+    store_hash: storeHash,
+    brands: items,
+  }) as Promise<BrandBulkRestoreResponse>;
+}
+
+export async function fetchBrandPreviewImageData(params: { brandId: number }) {
+  return ApiCall("brand-images/get-brand-preview-img-data", {
+    brand_id: params.brandId,
+  }) as Promise<BrandPreviewImageApiResponse>;
+}
+
 export async function optimizeCategoryImage(
   category: Pick<
     Category,
@@ -149,12 +224,48 @@ export async function optimizeCategoryImage(
   ) as Promise<CategoryOptimizeResponse>;
 }
 
+export async function bulkRestoreAllCategories() {
+  return ApiCall(
+    "category-images/bulk-restore-categories-all",
+    {},
+  ) as Promise<BulkRestoreAllCategoriesResponse>;
+}
+
+export async function bulkOptimizeAllCategories() {
+  return ApiCall(
+    "category-images/bulk-optimize-categories-all",
+    {},
+  ) as Promise<BulkOptimizeAllCategoriesResponse>;
+}
+
+export async function bulkOptimizeAllBrands() {
+  return ApiCall(
+    "brand-images/bulk-optimize-brands-all",
+    {},
+  ) as Promise<BulkOptimizeAllBrandsResponse>;
+}
+
+export async function bulkRestoreAllBrands() {
+  return ApiCall(
+    "brand-images/bulk-restore-brands-all",
+    {},
+  ) as Promise<BulkRestoreAllBrandsResponse>;
+}
+
 export async function bulkOptimizeCategoryImages(
   items: CategoryBulkOptimizeItem[],
 ) {
   return ApiCall("category-images/bulk-optimize-categories-checkbox", {
     categories: items,
   }) as Promise<CategoryBulkOptimizeResponse>;
+}
+
+export async function bulkRestoreCategoryImages(
+  items: CategoryBulkOptimizeItem[],
+) {
+  return ApiCall("category-images/bulk-restore-categories-checkbox", {
+    categories: items,
+  }) as Promise<CategoryBulkRestoreResponse>;
 }
 
 export async function restoreCategoryImage(
@@ -174,20 +285,18 @@ export async function fetchCategoryPreviewImageData(params: {
   }) as Promise<CategoryPreviewImageApiResponse>;
 }
 
-export async function fetchHomeImages(sync = true) {
-  return ApiCall("image-optimizer/home-images", {}, {
+export async function fetchDashboardStats() {
+  return ApiCall("settings/dashboard-stats", {}, {
     method: "GET",
-    query: { sync },
-  }) as Promise<HomeImagesApiResponse>;
+  }) as Promise<ClientDashboardStatsResponse>;
 }
 
-export async function optimizeHomeImage(
-  image: Pick<ContextualImage, "sourceType" | "sourceKey" | "originalUrl">,
-) {
-  const payload = buildHomeImageOptimizePayload(image);
+export async function fetchMerchantPlans() {
+  return ApiCall("settings/plans", {}, {
+    method: "GET",
+  }) as Promise<MerchantPlansResponse>;
+}
 
-  return ApiCall(
-    "image-optimizer/home-banner/optimize",
-    payload,
-  ) as Promise<HomeBannerOptimizeResponse>;
+export async function selectMerchantPlan(planSlug: string) {
+  return ApiCall("settings/select-plan", { plan_slug: planSlug }) as Promise<SelectPlanResponse>;
 }

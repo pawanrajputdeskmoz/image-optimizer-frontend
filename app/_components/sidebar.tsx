@@ -4,7 +4,7 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import Image from "next/image";
 import { basePath } from "@/app/lib/basePath";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import {
   LayoutDashboard,
   Image as ImageIcon,
@@ -20,7 +20,7 @@ import {
 function SidebarIcon({
   icon: Icon,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }) {
   return <Icon className="h-5 w-5 text-zinc-700" />;
 }
@@ -157,8 +157,8 @@ export default function Sidebar({
             <li>
               <Link
                 prefetch={false}
-                href="/upgrade?tab=app"
-                className={segment == "upgrade?tab=app" ? "active" : ""}
+                href="/upgrade"
+                className={segment === "upgrade" ? "active" : ""}
               >
                 <div className="nav-icon">
                   <SidebarIcon icon={BadgeDollarSign} />
@@ -171,7 +171,7 @@ export default function Sidebar({
               <Link
                 prefetch={false}
                 href="/upgrade?tab=seoServices"
-                className={segment == "upgrade?tab=seoServices" ? "active" : ""}
+                className={segment === "upgrade" ? "active" : ""}
               >
                 <div className="nav-icon">
                   <SidebarIcon icon={ShieldCheck} />

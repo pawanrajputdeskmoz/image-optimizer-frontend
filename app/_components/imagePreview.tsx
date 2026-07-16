@@ -1,5 +1,8 @@
 "use client";
 
+import PreviewComparisonPanel, {
+  type PreviewComparisonRow,
+} from "@/app/(bigCommerce)/dashboard/_components/previewComparisonPanel";
 import { useEffect, useState } from "react";
 import ReactCompareImage from "react-compare-image";
 
@@ -10,6 +13,7 @@ type Props = {
   onClose?: () => void;
   beforeLabel?: string;
   afterLabel?: string;
+  comparisonRows?: PreviewComparisonRow[];
 };
 
 const imageFitStyle = {
@@ -37,6 +41,7 @@ export default function ImageComparePopup({
   onClose,
   beforeLabel = "Original",
   afterLabel = "Optimized",
+  comparisonRows = [],
 }: Props) {
   const [isOpen, setIsOpen] = useState(open);
   const [imagesReady, setImagesReady] = useState(false);
@@ -84,33 +89,31 @@ export default function ImageComparePopup({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
-      <div className="relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white p-3 shadow-xl sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
+      <div className="relative w-full max-w-lg rounded-lg bg-white p-3 shadow-xl">
         <button
           type="button"
           onClick={close}
-          className="absolute top-2.5 right-2.5 z-10 text-gray-500 hover:text-black"
+          className="absolute top-2 right-2 z-10 text-gray-400 hover:text-gray-700"
           aria-label="Close"
         >
           ✕
         </button>
 
-        <h2 className="mb-2 pr-8 text-base font-semibold sm:text-lg">
-          Original vs Optimized
-        </h2>
+        <h2 className="mb-2 pr-6 text-sm font-semibold">Original vs Optimized</h2>
 
         <div
-          className="image-compare-root relative h-[min(300px,46vh)] shrink-0 overflow-hidden rounded-lg bg-gray-100 sm:h-[min(340px,50vh)]"
+          className="image-compare-root relative h-[min(220px,38vh)] overflow-hidden rounded-md bg-gray-100"
           style={{ touchAction: "none" }}
         >
           {loadError ? (
-            <p className="flex h-full items-center justify-center px-4 text-center text-sm text-red-600">
+            <p className="flex h-full items-center justify-center px-3 text-center text-xs text-red-600">
               Could not load images for comparison.
             </p>
           ) : !imagesReady ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2">
-              <span className="inline-block size-7 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-              <p className="text-sm text-gray-600">Preparing comparison…</p>
+            <div className="flex h-full flex-col items-center justify-center gap-1.5">
+              <span className="inline-block size-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+              <p className="text-xs text-gray-500">Loading…</p>
             </div>
           ) : (
             <ReactCompareImage
@@ -123,7 +126,7 @@ export default function ImageComparePopup({
               aspectRatio="wider"
               sliderLineColor="#ffffff"
               sliderLineWidth={2}
-              handleSize={36}
+              handleSize={30}
               hover={false}
               skeleton={
                 <div className="h-full w-full animate-pulse bg-gray-200" />
@@ -132,10 +135,11 @@ export default function ImageComparePopup({
           )}
         </div>
 
-        <div className="mt-2 flex justify-between gap-2 truncate text-xs text-gray-500 sm:text-sm">
-          <span className="truncate">{beforeLabel}</span>
-          <span className="truncate text-right">{afterLabel}</span>
-        </div>
+        {comparisonRows.length > 0 && (
+          <div className="mt-2">
+            <PreviewComparisonPanel rows={comparisonRows} />
+          </div>
+        )}
       </div>
     </div>
   );

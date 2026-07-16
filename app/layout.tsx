@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ChannelSelect from "./_components/channelList";
-import ReduxProvider from "./store/provider";
-import Sidebar from "./_components/sidebar";
+import AppChrome from "./_components/appChrome";
 import AppToaster from "./_components/app-toaster";
 
 const geistSans = Geist({
@@ -24,23 +23,13 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <AppToaster />
-        <section className="frame-area bg-zinc-50">
-          <div className="flex">
-            <Sidebar />
-            <div className="flex min-h-full w-full flex-1 flex-col !p-6">
-              <div className="relative z-20 mb-4 flex shrink-0 justify-end">
-                <ChannelSelect />
-              </div>
-              <ReduxProvider>{children}</ReduxProvider>
-            </div>
-          </div>
-        </section>
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );

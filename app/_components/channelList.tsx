@@ -55,6 +55,25 @@ function ChannelSelect() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Install flow stores api-token asynchronously; skip until token exists
+    // so we don't hit settings/channels without Authorization.
+    if (pathname === "/install") {
+      return;
+    }
+
+    const hasToken =
+      typeof window !== "undefined" &&
+      Boolean(
+        localStorage.getItem("api-token")?.trim() ||
+          localStorage.getItem("access_token")?.trim() ||
+          localStorage.getItem("token")?.trim(),
+      );
+
+    if (!hasToken) {
+      setIsLoading(false);
+      return;
+    }
+
     if (hasFetchedRef.current) {
       return;
     }
@@ -106,7 +125,7 @@ function ChannelSelect() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [pathname]);
 
   const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const nextId = Number(event.target.value);

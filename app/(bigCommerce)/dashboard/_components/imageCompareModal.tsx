@@ -1,60 +1,14 @@
 "use client";
 
 import ImageComparePopup from "@/app/_components/imagePreview";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { isApiError } from "../_lib/apiUtils";
 import { fetchPreviewImageData } from "../_lib/imageOptimizerApi";
-import { storageFilePathToPublicUrl } from "../_lib/previewFiles";
-import type { ImageItem, PreviewImageData } from "../types";
-
-function formatBytesLabel(bytes?: number): string | null {
-  if (typeof bytes !== "number" || !Number.isFinite(bytes)) {
-    return null;
-  }
-  return `${(bytes / 1024).toFixed(1)} KB`;
-}
-
-function resolveSizeLabel(
-  ...sources: (number | string | undefined)[]
-): string {
-  for (const source of sources) {
-    if (typeof source === "number") {
-      const label = formatBytesLabel(source);
-      if (label) {
-        return label;
-      }
-    }
-    if (typeof source === "string" && source.trim()) {
-      return source.trim();
-    }
-  }
-  return "—";
-}
-
-function parsePreviewPayload(preview: PreviewImageData | undefined): {
-  originalUrl: string;
-  optimizedUrl: string;
-  originalSizeLabel: string;
-  optimizedSizeLabel: string;
-} | null {
-  if (!preview) {
-    return null;
-  }
-
-  const originalUrl = storageFilePathToPublicUrl(preview.files?.original);
-  const optimizedUrl = storageFilePathToPublicUrl(preview.files?.optimized);
-
-  if (!originalUrl || !optimizedUrl) {
-    return null;
-  }
-
-  return {
-    originalUrl,
-    optimizedUrl,
-    originalSizeLabel: resolveSizeLabel(preview.oldData?.original?.size),
-    optimizedSizeLabel: resolveSizeLabel(preview.oldData?.optimized?.size),
-  };
-}
+import {
+  parseProductPreviewData,
+  type ProductPreviewView,
+} from "../_lib/previewMappers";
+import type { ImageItem } from "../types";
 
 type ImageCompareModalProps = {
   open: boolean;
@@ -69,18 +23,14 @@ export default function ImageCompareModal({
   productId,
   image,
 }: ImageCompareModalProps) {
-  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
-  const [optimizedUrl, setOptimizedUrl] = useState<string | null>(null);
-  const [originalSizeLabel, setOriginalSizeLabel] = useState("—");
-  const [optimizedSizeLabel, setOptimizedSizeLabel] = useState("—");
+  const [preview, setPreview] = useState<ProductPreviewView | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadPreview = useCallback(async () => {
     setIsLoading(true);
     setFetchError(null);
-    setOriginalUrl(null);
-    setOptimizedUrl(null);
+    setPreview(null);
 
     try {
       const response = await fetchPreviewImageData(productId, image);
@@ -90,17 +40,14 @@ export default function ImageCompareModal({
         return;
       }
 
-      const parsed = parsePreviewPayload(response?.data);
+      const parsed = parseProductPreviewData(response?.data);
 
       if (!parsed) {
         setFetchError("Preview files are not available for comparison.");
         return;
       }
 
-      setOriginalUrl(parsed.originalUrl);
-      setOptimizedUrl(parsed.optimizedUrl);
-      setOriginalSizeLabel(parsed.originalSizeLabel);
-      setOptimizedSizeLabel(parsed.optimizedSizeLabel);
+      setPreview(parsed);
     } catch {
       setFetchError("Could not load preview images.");
     } finally {
@@ -112,8 +59,7 @@ export default function ImageCompareModal({
     if (open) {
       void loadPreview();
     } else {
-      setOriginalUrl(null);
-      setOptimizedUrl(null);
+      setPreview(null);
       setFetchError(null);
     }
   }, [open, loadPreview]);
@@ -133,7 +79,7 @@ export default function ImageCompareModal({
     );
   }
 
-  if (fetchError || !originalUrl || !optimizedUrl) {
+  if (fetchError || !preview) {
     return (
       <CompareShell onClose={onClose}>
         <p className="mb-4 text-sm text-red-600">
@@ -152,12 +98,30 @@ export default function ImageCompareModal({
 
   return (
     <ImageComparePopup
-      beforeSrc={originalUrl}
-      afterSrc={optimizedUrl}
+      beforeSrc={preview.originalUrl}
+      afterSrc={preview.optimizedUrl}
       open
       onClose={onClose}
-      beforeLabel={`Original · ${originalSizeLabel}`}
-      afterLabel={`Optimized · ${optimizedSizeLabel}`}
+      beforeLabel="Original"
+      afterLabel="Optimized"
+      comparisonRows={[
+        {
+          label: "Name",
+          before: preview.oldName,
+          after: preview.newName,
+        },
+        {
+          label: "Alt",
+          before: preview.oldAltText,
+          after: preview.newAltText,
+        },
+        {
+          label: "Size",
+          before: preview.oldSizeLabel,
+          after: preview.newSizeLabel,
+          savedPercentage: preview.savedPercentage,
+        },
+      ]}
     />
   );
 }
@@ -167,7 +131,7 @@ function CompareShell({
   children,
 }: {
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

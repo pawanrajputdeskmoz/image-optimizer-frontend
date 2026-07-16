@@ -1,9 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 type ConfirmModalProps = {
   show: boolean;
   handleClose: () => void;
-  message: React.ReactNode;
+  message: ReactNode;
   handleYes: () => void;
   handleNo: () => void;
 };

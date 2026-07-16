@@ -11,6 +11,10 @@ import { CAROUSEL_ROW_NOTE_TITLE } from "../_lib/contextualImageMessages";
 import { PLACEHOLDER_IMAGE } from "../_lib/productMappers";
 import type { ContextualImage } from "../types";
 
+function isCarouselLimited(image: ContextualImage): boolean {
+  return !image.isUpdateSupported && image.sourceType !== "marketing_banner";
+}
+
 type ContextualImageRowProps = {
   image: ContextualImage;
   isSelected?: boolean;
@@ -43,10 +47,11 @@ export default function ContextualImageRow({
   const isCategoryOptimizedState = usesCategoryStatus
     ? isCategoryOptimizeDisabled(categoryStatus)
     : image.isOptimized;
+  const carouselLimited = isCarouselLimited(image);
   const isOptimizeDisabled =
     isBusy ||
     !onOptimize ||
-    !image.isUpdateSupported ||
+    carouselLimited ||
     (usesCategoryStatus
       ? isCategoryOptimizeDisabled(categoryStatus)
       : image.isOptimized);
@@ -89,7 +94,7 @@ export default function ContextualImageRow({
 
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-sm font-medium">
-          {!image.isUpdateSupported && image.sourceType !== "category" ? (
+          {carouselLimited && image.sourceType !== "category" ? (
             <span
               className="shrink-0 font-semibold text-amber-600"
               title={CAROUSEL_ROW_NOTE_TITLE}
@@ -143,7 +148,7 @@ export default function ContextualImageRow({
             image.sourceType === "category" &&
             (image.status === "no_image" || !image.isUpdateSupported)
               ? "No image available for this category"
-              : !image.isUpdateSupported && !image.isOptimized
+              : carouselLimited && !image.isOptimized
                 ? CAROUSEL_ROW_NOTE_TITLE
                 : undefined
           }

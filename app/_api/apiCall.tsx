@@ -33,6 +33,10 @@ export type ApiCallOptions = {
   rawBody?: boolean;
   /** Appended as URL query string, e.g. ?query=shirt */
   query?: Record<string, string | number | boolean | null | undefined>;
+  /** Abort in-flight request (e.g. when a toggle is flipped again quickly) */
+  signal?: AbortSignal;
+  /** Skip automatic error toasts — caller handles user messaging */
+  suppressToast?: boolean;
 };
 
 export async function ApiCall(
@@ -102,7 +106,7 @@ export async function ApiCall(
       }
     }
 
-    const init: RequestInit = { method, headers };
+    const init: RequestInit = { method, headers, signal: opts?.signal };
 
     if (method !== "GET") {
       if (rawBody) {
@@ -148,7 +152,9 @@ export async function ApiCall(
         }
       }
 
-      showApiErrorToast(response.status, message);
+      if (!opts?.suppressToast) {
+        showApiErrorToast(response.status, message);
+      }
       return {
         error: `HTTP ${response.status}: ${message}`,
         status: response.status,
@@ -165,8 +171,11 @@ export async function ApiCall(
       return text;
     }
   } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
+      return { aborted: true };
+    }
     console.error("API call failed:", err);
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !opts?.suppressToast) {
       toast.error("Something went wrong");
     }
     return {

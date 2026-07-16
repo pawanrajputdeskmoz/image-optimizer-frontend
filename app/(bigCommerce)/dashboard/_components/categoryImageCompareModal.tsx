@@ -1,7 +1,7 @@
 "use client";
 
 import ImageComparePopup from "@/app/_components/imagePreview";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { isApiError } from "../_lib/apiUtils";
 import { fetchCategoryPreviewImageData } from "../_lib/imageOptimizerApi";
 import type { Category, CategoryPreviewImageData } from "../types";
@@ -160,7 +160,7 @@ function CompareShell({
   children,
 }: {
   onClose: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import TemplateBox from "./_components/templateBox";
@@ -144,6 +144,53 @@ function applyDefaults(channel: number) {
   } satisfies SettingsRow;
 }
 
+function CruseControlSwitch({
+  label,
+  enabled,
+  pending,
+  disabled,
+  onToggle,
+  ariaLabels,
+}: {
+  label: string;
+  enabled: boolean;
+  pending: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  ariaLabels: { on: string; off: string; busy: string };
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm text-gray-600">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-busy={pending}
+        aria-label={pending ? ariaLabels.busy : enabled ? ariaLabels.off : ariaLabels.on}
+        disabled={disabled || pending}
+        onClick={onToggle}
+        className={`relative inline-flex h-6 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+          enabled ? "bg-blue-600" : "bg-gray-300"
+        }`}
+      >
+        {pending ? (
+          <span
+            className="absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-2 border-white/40 border-t-white"
+            aria-hidden
+          />
+        ) : (
+          <span
+            className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+              enabled ? "translate-x-6" : "translate-x-0"
+            }`}
+          />
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function SettingsUI() {
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -161,6 +208,14 @@ export default function SettingsUI() {
   const activePreset = getActivePreset(quality);
   const [outputFormat, setOutputFormat] = useState<string>("webp");
   const [autoOptimize, setAutoOptimize] = useState(true);
+  const [autoOptimizeCategory, setAutoOptimizeCategory] = useState(false);
+  const [webhookTogglePending, setWebhookTogglePending] = useState(false);
+  const [categoryWebhookTogglePending, setCategoryWebhookTogglePending] =
+    useState(false);
+  const webhookAbortRef = useRef<AbortController | null>(null);
+  const categoryWebhookAbortRef = useRef<AbortController | null>(null);
+  const webhookRequestIdRef = useRef(0);
+  const categoryWebhookRequestIdRef = useRef(0);
 
   const formatConversionEnabled = outputFormat !== "original";
 
@@ -251,6 +306,118 @@ export default function SettingsUI() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const productAbortRef = webhookAbortRef;
+    const categoryAbortRef = categoryWebhookAbortRef;
+
+    return () => {
+      productAbortRef.current?.abort();
+      categoryAbortRef.current?.abort();
+    };
+  }, []);
+
+  async function handleWebhookToggle({
+    path,
+    enabled,
+    setEnabled,
+    abortRef,
+    requestIdRef,
+    setPending,
+    fallbackMessages,
+    onSuccess,
+  }: {
+    path: string;
+    enabled: boolean;
+    setEnabled: (value: boolean) => void;
+    abortRef: MutableRefObject<AbortController | null>;
+    requestIdRef: MutableRefObject<number>;
+    setPending: (value: boolean) => void;
+    fallbackMessages: { on: string; off: string };
+    onSuccess?: (next: boolean) => void;
+  }) {
+    const next = !enabled;
+    const previous = enabled;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestId = ++requestIdRef.current;
+
+    setEnabled(next);
+    setPending(true);
+
+    try {
+      const data = await ApiCall(
+        path,
+        {},
+        {
+          method: next ? "POST" : "DELETE",
+          signal: controller.signal,
+        },
+      );
+
+      if (requestId !== requestIdRef.current) return;
+      if (data && typeof data === "object" && "aborted" in data) return;
+
+      if (isApiError(data) || isApiFailure(data as { success?: boolean })) {
+        setEnabled(previous);
+        return;
+      }
+
+      const message =
+        data &&
+        typeof data === "object" &&
+        "message" in data &&
+        typeof (data as { message?: unknown }).message === "string"
+          ? (data as { message: string }).message
+          : next
+            ? fallbackMessages.on
+            : fallbackMessages.off;
+
+      onSuccess?.(next);
+      toast.success(message);
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setPending(false);
+      }
+    }
+  }
+
+  function handleAutoOptimizeToggle() {
+    void handleWebhookToggle({
+      path: "settings/webhooks/product-created",
+      enabled: autoOptimize,
+      setEnabled: setAutoOptimize,
+      abortRef: webhookAbortRef,
+      requestIdRef: webhookRequestIdRef,
+      setPending: setWebhookTogglePending,
+      fallbackMessages: {
+        on: "Auto-optimize enabled for new product images",
+        off: "Auto-optimize disabled for new product images",
+      },
+      onSuccess: (next) => {
+        setBaseline((current) =>
+          current ? { ...current, auto_optimize_new_images: next } : current,
+        );
+      },
+    });
+  }
+
+  function handleCategoryWebhookToggle() {
+    void handleWebhookToggle({
+      path: "settings/webhooks/category-created",
+      enabled: autoOptimizeCategory,
+      setEnabled: setAutoOptimizeCategory,
+      abortRef: categoryWebhookAbortRef,
+      requestIdRef: categoryWebhookRequestIdRef,
+      setPending: setCategoryWebhookTogglePending,
+      fallbackMessages: {
+        on: "Auto-optimize enabled for new category images",
+        off: "Auto-optimize disabled for new category images",
+      },
+    });
+  }
 
   async function handleSave() {
     setSavePending(true);
@@ -552,25 +719,31 @@ export default function SettingsUI() {
         <div className="bg-white border rounded-xl shadow-sm p-4 space-y-4">
           <h2 className="font-semibold text-gray-700">Cruse Control</h2>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">
-              Auto-Optimize New Images
-            </span>
-            <button
-              type="button"
-              onClick={() => setAutoOptimize(!autoOptimize)}
-              className={`w-12 h-6 flex items-center rounded-full p-1 ${
-                autoOptimize ? "bg-blue-600" : "bg-gray-300"
-              }`}
-              aria-pressed={autoOptimize}
-            >
-              <div
-                className={`bg-white w-4 h-4 rounded-full transform ${
-                  autoOptimize ? "translate-x-6" : ""
-                }`}
-              />
-            </button>
-          </div>
+          <CruseControlSwitch
+            label="Auto-Optimize New Product Images"
+            enabled={autoOptimize}
+            pending={webhookTogglePending}
+            disabled={loadState === "loading"}
+            onToggle={handleAutoOptimizeToggle}
+            ariaLabels={{
+              on: "Enable auto-optimize for new product images",
+              off: "Disable auto-optimize for new product images",
+              busy: "Updating product auto-optimize setting",
+            }}
+          />
+
+          <CruseControlSwitch
+            label="Auto-Optimize New Category Images"
+            enabled={autoOptimizeCategory}
+            pending={categoryWebhookTogglePending}
+            disabled={loadState === "loading"}
+            onToggle={handleCategoryWebhookToggle}
+            ariaLabels={{
+              on: "Enable auto-optimize for new category images",
+              off: "Disable auto-optimize for new category images",
+              busy: "Updating category auto-optimize setting",
+            }}
+          />
         </div>
 
         <div className="bg-white border rounded-xl shadow-sm overflow-hidden">

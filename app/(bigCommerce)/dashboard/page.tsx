@@ -15,14 +15,21 @@ import {
 } from "@/components/ui/accordion";
 
 import AltTextField from "./_components/altTextField";
+import BrandImageListing from "./_components/brandImageListing";
 import CategoryImageListing from "./_components/categoryImageListing";
-import HomeImageListing from "./_components/homeImageListing";
+import DashboardStatsCards from "./_components/dashboardStatsCards";
 import ImageCompareModal from "./_components/imageCompareModal";
-import { isApiError, isApiFailure } from "./_lib/apiUtils";
+import ListingPagination from "./_components/listingPagination";
+import { isApiError, isApiFailure, notifyApiBusinessFailure } from "./_lib/apiUtils";
 import { buildBulkOptimizeItem, bulkSelectionKey } from "./_lib/bulkSelection";
 import {
+  bulkOptimizeAllBrands,
+  bulkOptimizeAllCategories,
   bulkOptimizeAllImages,
   bulkOptimizeImages,
+  bulkRestoreAllBrands,
+  bulkRestoreAllCategories,
+  bulkRestoreAllImages,
   bulkRestoreImages,
   fetchProductList,
   optimizeSingleImage,
@@ -49,7 +56,6 @@ const LIST_TYPE_OPTIONS: { id: ImageListType; label: string }[] = [
   { id: "product", label: "Product" },
   { id: "categories", label: "Categories" },
   { id: "brand", label: "Brand" },
-  { id: "home", label: "Home" },
 ];
 
 type PreviewTarget = {
@@ -57,7 +63,7 @@ type PreviewTarget = {
   image: ImageItem;
 };
 
-const PRODUCTS_PER_PAGE = 5;
+const PRODUCT_PER_PAGE_OPTIONS = [5, 10] as const;
 
 function altTextKey(productId: number, imageId: number) {
   return `${productId}-${imageId}`;
@@ -73,6 +79,7 @@ export default function DashboardPage() {
   const [productsError, setProductsError] = useState<string | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage, setProductsPerPage] = useState<number>(5);
   const [serverTotalPages, setServerTotalPages] = useState(1);
 
   const [selectedImages, setSelectedImages] = useState<
@@ -95,6 +102,7 @@ export default function DashboardPage() {
   >({});
   const [bulkOptimizePending, setBulkOptimizePending] = useState(false);
   const [bulkOptimizeAllPending, setBulkOptimizeAllPending] = useState(false);
+  const [bulkRestoreAllPending, setBulkRestoreAllPending] = useState(false);
   const [bulkRestorePending, setBulkRestorePending] = useState(false);
   const [allOptimizedAlertOpen, setAllOptimizedAlertOpen] = useState(false);
   const [productsRefreshNonce, setProductsRefreshNonce] = useState(0);
@@ -413,32 +421,146 @@ export default function DashboardPage() {
     setBulkOptimizeAllPending(true);
 
     try {
-      const response = await bulkOptimizeAllImages();
+      if (listType === "product") {
+        const response = await bulkOptimizeAllImages();
+        if (notifyApiBusinessFailure(response, "Product image optimization failed")) {
+          return;
+        }
+        const queued = response?.data?.queued;
+        const skipped = response?.data?.skipped ?? 0;
+        setProductsRefreshNonce((n) => n + 1);
+        toast.success(
+          response.message ||
+            (typeof queued === "number"
+              ? skipped > 0
+                ? `${queued} product image(s) queued (${skipped} skipped)`
+                : `${queued} product image(s) queued for optimization`
+              : "All product images queued for optimization"),
+        );
+        return;
+      }
+
+      if (listType === "categories") {
+        const response = await bulkOptimizeAllCategories();
+        if (notifyApiBusinessFailure(response, "Category image optimization failed")) {
+          return;
+        }
+        const queued = response?.data?.queued;
+        const skipped = response?.data?.skipped ?? 0;
+        setProductsRefreshNonce((n) => n + 1);
+        toast.success(
+          response.message ||
+            (typeof queued === "number"
+              ? skipped > 0
+                ? `${queued} category image(s) queued (${skipped} skipped)`
+                : `${queued} category image(s) queued for optimization`
+              : "All category images queued for optimization"),
+        );
+        return;
+      }
+
+      const response = await bulkOptimizeAllBrands();
+      if (notifyApiBusinessFailure(response, "Brand image optimization failed")) {
+        return;
+      }
+      const queued = response?.data?.queued;
+      const skipped = response?.data?.skipped ?? 0;
+      setProductsRefreshNonce((n) => n + 1);
+      toast.success(
+        response.message ||
+          (typeof queued === "number"
+            ? skipped > 0
+              ? `${queued} brand image(s) queued (${skipped} skipped)`
+              : `${queued} brand image(s) queued for optimization`
+            : "All brand images queued for optimization"),
+      );
+    } finally {
+      setBulkOptimizeAllPending(false);
+    }
+  }, [listType]);
+
+  const handleBulkRestoreAll = useCallback(async () => {
+    setBulkRestoreAllPending(true);
+
+    try {
+      if (listType === "product") {
+        const response = await bulkRestoreAllImages();
+
+        if (isApiError(response)) {
+          return;
+        }
+
+        if (isApiFailure(response)) {
+          toast.error(response.message || "Product image restore failed");
+          return;
+        }
+
+        const queued = response?.data?.queued;
+        const skipped = response?.data?.skipped ?? 0;
+        setProductsRefreshNonce((n) => n + 1);
+        toast.success(
+          response.message ||
+            (typeof queued === "number"
+              ? skipped > 0
+                ? `${queued} product image(s) queued for restore (${skipped} skipped)`
+                : `${queued} product image(s) queued for restore`
+              : "All product images queued for restore"),
+        );
+        return;
+      }
+
+      if (listType === "categories") {
+        const response = await bulkRestoreAllCategories();
+
+        if (isApiError(response)) {
+          return;
+        }
+
+        if (isApiFailure(response)) {
+          toast.error(response.message || "Category image restore failed");
+          return;
+        }
+
+        const queued = response?.data?.queued;
+        const skipped = response?.data?.skipped ?? 0;
+        setProductsRefreshNonce((n) => n + 1);
+        toast.success(
+          response.message ||
+            (typeof queued === "number"
+              ? skipped > 0
+                ? `${queued} category image(s) queued for restore (${skipped} skipped)`
+                : `${queued} category image(s) queued for restore`
+              : "All category images queued for restore"),
+        );
+        return;
+      }
+
+      const response = await bulkRestoreAllBrands();
 
       if (isApiError(response)) {
         return;
       }
 
       if (isApiFailure(response)) {
-        toast.error(response.message || "Bulk image optimization failed");
+        toast.error(response.message || "Brand image restore failed");
         return;
       }
 
       const queued = response?.data?.queued;
       const skipped = response?.data?.skipped ?? 0;
-
+      setProductsRefreshNonce((n) => n + 1);
       toast.success(
         response.message ||
           (typeof queued === "number"
             ? skipped > 0
-              ? `${queued} image(s) queued (${skipped} skipped)`
-              : `${queued} image(s) queued for optimization`
-            : "All images queued for optimization"),
+              ? `${queued} brand image(s) queued for restore (${skipped} skipped)`
+              : `${queued} brand image(s) queued for restore`
+            : "All brand images queued for restore"),
       );
     } finally {
-      setBulkOptimizeAllPending(false);
+      setBulkRestoreAllPending(false);
     }
-  }, []);
+  }, [listType]);
 
   const bulkRestoreSelected = useCallback(async () => {
     const payload = bulkSelectedOptimizedList;
@@ -499,7 +621,19 @@ export default function DashboardPage() {
 
         const result = response.data;
 
+        if (response.skipped === true || result?.status === "skipped") {
+          toast.message(
+            result?.skip_reason ||
+              response.message ||
+              "Image is already queued for optimization.",
+          );
+          return;
+        }
+
         if (response.success !== true || result?.status !== "optimized") {
+          if (response.message) {
+            toast.error(response.message);
+          }
           return;
         }
 
@@ -725,7 +859,7 @@ export default function DashboardPage() {
         const response = await fetchProductList({
           storeHash,
           page: currentPage,
-          limit: PRODUCTS_PER_PAGE,
+          limit: productsPerPage,
           search: debouncedSearch,
         });
 
@@ -797,7 +931,12 @@ export default function DashboardPage() {
     return () => {
       isCancelled = true;
     };
-  }, [currentPage, debouncedSearch, listType, productsRefreshNonce]);
+  }, [currentPage, debouncedSearch, listType, productsPerPage, productsRefreshNonce]);
+
+  const handleProductsPerPageChange = useCallback((nextPerPage: number) => {
+    setProductsPerPage(nextPerPage);
+    setCurrentPage(1);
+  }, []);
 
   const handleListTypeChange = useCallback((nextType: ImageListType) => {
     if (nextType === listType) {
@@ -814,6 +953,8 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-100 p-4">
       <div className="rounded-2xl bg-white p-4 shadow-lg">
 
+        <DashboardStatsCards refreshNonce={productsRefreshNonce} />
+
         {/* HEADER */}
 
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -829,6 +970,15 @@ export default function DashboardPage() {
               {bulkOptimizeAllPending
                 ? "Optimizing all…"
                 : "Bulk image optimization"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void handleBulkRestoreAll()}
+              disabled={bulkRestoreAllPending}
+              className="rounded border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bulkRestoreAllPending ? "Restoring all…" : "Bulk restore"}
             </button>
 
             <button
@@ -907,14 +1057,8 @@ export default function DashboardPage() {
           <CategoryImageListing refreshNonce={productsRefreshNonce} />
         ) : null}
 
-        {listType === "home" ? (
-          <HomeImageListing refreshNonce={productsRefreshNonce} />
-        ) : null}
-
         {listType === "brand" ? (
-          <div className="rounded-lg border bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
-            Brand image listing coming soon.
-          </div>
+          <BrandImageListing refreshNonce={productsRefreshNonce} />
         ) : null}
 
         {/* PRODUCTS */}
@@ -1235,36 +1379,16 @@ export default function DashboardPage() {
         {/* PAGINATION */}
 
         {listType === "product" ? (
-        <div className="mt-6 flex items-center justify-between">
-          <span className="text-sm">
-            Page {safeCurrentPage} of{" "}
-            {totalPages}
-          </span>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() =>
-                goToPage(safeCurrentPage - 1)
-              }
-              disabled={safeCurrentPage === 1}
-              className="rounded border px-4 py-2 disabled:opacity-50"
-            >
-              Prev
-            </button>
-
-            <button
-              onClick={() =>
-                goToPage(safeCurrentPage + 1)
-              }
-              disabled={
-                safeCurrentPage === totalPages
-              }
-              className="rounded border px-4 py-2 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+        <ListingPagination
+          className="mt-6"
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          onPageChange={goToPage}
+          perPage={productsPerPage}
+          perPageOptions={[...PRODUCT_PER_PAGE_OPTIONS]}
+          onPerPageChange={handleProductsPerPageChange}
+          perPageLabel="Products per page"
+        />
         ) : null}
       </div>
 
