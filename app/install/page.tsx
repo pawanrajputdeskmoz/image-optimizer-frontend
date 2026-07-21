@@ -20,6 +20,7 @@ function InstallContent() {
 
   useEffect(() => {
     let isMounted = true;
+    console.log("running")
 
     InstallApi("store/load-application", { code, context, scope, signed_payload_jwt: singed_payload })
       .then((data: InstallResponse) => {
