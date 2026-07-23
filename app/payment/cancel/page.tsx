@@ -37,6 +37,8 @@ function PaymentCancelContent() {
         window.location.href = approvalUrl;
         return;
       }
+      toast.error("Could not restart checkout. Please pick a plan again.");
+      return;
     } catch (error) {
       notifyPaymentError(error);
     }
@@ -49,7 +51,7 @@ function PaymentCancelContent() {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
           <XCircle className="h-8 w-8 text-amber-500" />
         </div>
-        <h1 className="text-xl font-bold text-gray-900">Payment cancelled</h1>
+        <h1 className="text-xl font-bold text-gray-900">Subscription cancelled</h1>
         <p className="mt-2 text-sm text-gray-500">
           You cancelled the PayPal checkout. No charge was made.
         </p>
@@ -62,7 +64,7 @@ function PaymentCancelContent() {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {retrying ? <Spinner size="sm" /> : null}
-            Retry payment
+            Retry subscription
           </button>
           <Link
             href="/upgrade"

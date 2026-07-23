@@ -125,7 +125,7 @@ function MerchantPlanCard({
       : isUpgrade
         ? "Upgrade"
         : "Switch plan";
-  const busyLabel = isPaidUpgrade ? "Redirecting…" : "Updating…";
+  const busyLabel = isPaidUpgrade ? "Opening…" : "Updating…";
 
   return (
     <article
@@ -241,19 +241,28 @@ function PayPalCheckoutModal({
         {processing ? (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-500">
             <Spinner size="sm" />
-            Confirming your payment…
+            Confirming your subscription…
           </div>
         ) : PAYPAL_CLIENT_ID ? (
           <PayPalScriptProvider
-            options={{ clientId: PAYPAL_CLIENT_ID, currency, intent: "capture" }}
+            options={{
+              clientId: PAYPAL_CLIENT_ID,
+              currency,
+              intent: "subscription",
+              vault: true,
+            }}
           >
             <PayPalButtons
               style={{ layout: "vertical", shape: "rect" }}
               forceReRender={[plan.slug, currency]}
-              createOrder={async () => {
+              createSubscription={async () => {
                 try {
                   const res = await createPayment(plan.slug);
-                  return res.paypalOrderId as string;
+                  const id = res.paypalSubscriptionId?.trim();
+                  if (!id) {
+                    throw new Error("Subscription ID is missing.");
+                  }
+                  return id;
                 } catch (err) {
                   notifyPaymentError(err);
                   throw err;
@@ -262,7 +271,8 @@ function PayPalCheckoutModal({
               onApprove={async (data) => {
                 setProcessing(true);
                 try {
-                  const result = await capturePayment(data.orderID ?? "");
+                  const subscriptionId = data.subscriptionID ?? "";
+                  const result = await capturePayment(subscriptionId);
                   if (result.subscription?.status === "PENDING_ACTIVATION") {
                     toast.warning(
                       "Payment received. Plan activation is processing — please refresh shortly.",
@@ -281,7 +291,7 @@ function PayPalCheckoutModal({
                 toast.info("Payment cancelled. No charge was made.");
               }}
               onError={() => {
-                // createOrder/onApprove already surface payment errors via notifyPaymentError.
+                // createSubscription/onApprove already surface errors via notifyPaymentError.
               }}
             />
           </PayPalScriptProvider>
@@ -292,7 +302,7 @@ function PayPalCheckoutModal({
         )}
 
         <p className="mt-3 text-center text-xs text-gray-400">
-          Secured by PayPal. Pay with your PayPal balance or card.
+          Secured by PayPal. Use PayPal or debit/credit card.
         </p>
       </div>
     </div>

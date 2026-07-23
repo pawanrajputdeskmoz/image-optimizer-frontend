@@ -3,13 +3,12 @@
 import Spinner from "@/app/_components/ui/Spinner";
 import {
   capturePayment,
-  getSubscriptionAmount,
-  getSubscriptionCurrency,
   getSubscriptionName,
   getSubscriptionStatus,
   getSubscriptionTransactionId,
   notifyPaymentError,
   PAYPAL_CHECKOUT_PLAN_KEY,
+  PAYPAL_SUBSCRIPTION_ID_KEY,
   type SubscriptionRecord,
 } from "@/services/payment";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -28,48 +27,64 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function resolveSubscriptionId(searchParams: URLSearchParams): string {
+  const fromUrl = (
+    searchParams.get("subscription_id") ??
+    searchParams.get("token") ??
+    ""
+  ).trim();
+  if (fromUrl) return fromUrl;
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(PAYPAL_SUBSCRIPTION_ID_KEY)?.trim() ?? "";
+}
+
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
-  const token = (searchParams.get("token") ?? searchParams.get("orderID") ?? "").trim();
+  const [subscriptionId] = useState(() => resolveSubscriptionId(searchParams));
 
   const capturedRef = useRef(false);
-  const [state, setState] = useState<CaptureState>(() => (token ? "loading" : "error"));
+  const [state, setState] = useState<CaptureState>(() =>
+    subscriptionId ? "loading" : "error",
+  );
   const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(() =>
-    token ? null : "Missing PayPal order reference. Please retry from the plans page.",
+    subscriptionId
+      ? null
+      : "Missing PayPal subscription reference. Please retry from the plans page.",
   );
 
   useEffect(() => {
-    if (!token || capturedRef.current) return;
+    if (!subscriptionId || capturedRef.current) return;
     capturedRef.current = true;
 
-    const runCapture = async () => {
+    const confirmSubscription = async () => {
       try {
-        const result = await capturePayment(token);
+        const result = await capturePayment(subscriptionId);
         setSubscription(result.subscription ?? null);
         setState("success");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem(PAYPAL_CHECKOUT_PLAN_KEY);
+          sessionStorage.removeItem(PAYPAL_SUBSCRIPTION_ID_KEY);
         }
       } catch (error) {
         notifyPaymentError(error);
         const message =
           error instanceof Error
             ? error.message
-            : "We could not confirm your payment. Please contact support.";
+            : "We could not confirm your subscription. Please contact support.";
         setState("error");
         setErrorMessage(message);
       }
     };
 
-    void runCapture();
-  }, [token]);
+    void confirmSubscription();
+  }, [subscriptionId]);
 
   if (state === "loading") {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-sm text-gray-500">
         <Spinner />
-        Confirming your payment…
+        Confirming your subscription…
       </div>
     );
   }
@@ -81,7 +96,7 @@ function PaymentSuccessContent() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
             <XCircle className="h-8 w-8 text-red-500" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Payment not confirmed</h1>
+          <h1 className="text-xl font-bold text-gray-900">Subscription not confirmed</h1>
           <p className="mt-2 text-sm text-gray-500">{errorMessage}</p>
           <Link
             href="/upgrade"
@@ -103,7 +118,9 @@ function PaymentSuccessContent() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
             <CheckCircle2 className="h-8 w-8 text-emerald-600" />
           </div>
-          <h1 className="text-xl font-bold text-gray-900">Payment successful</h1>
+          <h1 className="text-xl font-bold text-gray-900">
+            {isPending ? "Subscription received" : "Subscription active"}
+          </h1>
           <p className="mt-2 text-sm text-gray-500">
             {isPending
               ? "Payment received, but plan activation is still processing. Please refresh in a moment or contact support if it persists."
@@ -114,13 +131,9 @@ function PaymentSuccessContent() {
         {subscription ? (
           <div className="mt-6 rounded-xl border border-gray-100 bg-gray-50 px-4 py-2">
             <DetailRow label="Plan" value={getSubscriptionName(subscription)} />
-            <DetailRow
-              label="Amount"
-              value={`${getSubscriptionAmount(subscription)} ${getSubscriptionCurrency(subscription)}`}
-            />
             <DetailRow label="Status" value={getSubscriptionStatus(subscription)} />
             <DetailRow
-              label="Transaction ID"
+              label="Subscription ID"
               value={getSubscriptionTransactionId(subscription)}
             />
           </div>
