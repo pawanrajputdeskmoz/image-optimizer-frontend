@@ -5,6 +5,7 @@ function getAllowedDevOrigins(): string[] {
     "localhost",
     "127.0.0.1",
     "*.shares.zrok.io",
+    "*.trycloudflare.com",
   ]);
 
   const candidateUrls = [

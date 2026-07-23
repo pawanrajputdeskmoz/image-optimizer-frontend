@@ -12,12 +12,7 @@ export function isBrandOptimized(status?: string | null): boolean {
 
 export function isBrandOptimizeDisabled(status?: string | null): boolean {
   const normalized = (status ?? "").trim().toLowerCase();
-  return (
-    normalized === "optimized" ||
-    normalized === "completed" ||
-    normalized === "optimizing" ||
-    normalized === "processing"
-  );
+  return normalized === "optimizing" || normalized === "processing";
 }
 
 export function getBrandOptimizeButtonLabel(
@@ -31,7 +26,7 @@ export function getBrandOptimizeButtonLabel(
   const normalized = status.trim().toLowerCase();
 
   if (normalized === "optimized" || normalized === "completed") {
-    return "Optimized";
+    return "Optimize";
   }
 
   if (normalized === "optimizing" || normalized === "processing") {

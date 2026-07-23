@@ -542,9 +542,7 @@ export default function BrandImageListing({
                         className={`rounded px-3 py-2 text-sm text-white disabled:cursor-not-allowed ${
                           !brand.hasImage
                             ? "bg-gray-400 opacity-80"
-                            : isOptimized
-                              ? "bg-emerald-700 opacity-90"
-                              : "bg-black disabled:opacity-50"
+                            : "bg-black disabled:opacity-50"
                         }`}
                       >
                         {optimizeButtonLabel}

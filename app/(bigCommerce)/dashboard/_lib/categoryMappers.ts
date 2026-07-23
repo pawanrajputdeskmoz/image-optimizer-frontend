@@ -14,11 +14,9 @@ export function isCategoryOptimized(status?: string | null): boolean {
 export function isCategoryOptimizeDisabled(status?: string | null): boolean {
   const normalized = (status ?? "").trim().toLowerCase();
   return (
-    normalized === "optimized" ||
-    normalized === "uploaded" ||
+    normalized === "no_image" ||
     normalized === "optimizing" ||
-    normalized === "processing" ||
-    normalized === "no_image"
+    normalized === "processing"
   );
 }
 
@@ -37,7 +35,7 @@ export function getCategoryOptimizeButtonLabel(
   }
 
   if (normalized === "optimized" || normalized === "uploaded") {
-    return "Optimized";
+    return "Optimize";
   }
 
   if (normalized === "optimizing" || normalized === "processing") {

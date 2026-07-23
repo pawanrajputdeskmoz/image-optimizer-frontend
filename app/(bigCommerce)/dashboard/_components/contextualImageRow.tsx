@@ -44,9 +44,6 @@ export default function ContextualImageRow({
   const subtitle = buildSubtitle(image);
   const usesCategoryStatus = image.sourceType === "category" && image.status;
   const categoryStatus = image.status ?? "pending";
-  const isCategoryOptimizedState = usesCategoryStatus
-    ? isCategoryOptimizeDisabled(categoryStatus)
-    : image.isOptimized;
   const carouselLimited = isCarouselLimited(image);
   const isOptimizeDisabled =
     isBusy ||
@@ -156,9 +153,7 @@ export default function ContextualImageRow({
           className={`rounded px-3 py-2 text-sm text-white disabled:cursor-not-allowed ${
             image.sourceType === "category" && image.status === "no_image"
               ? "bg-gray-400 opacity-80"
-              : isCategoryOptimizedState
-                ? "bg-emerald-700 opacity-90"
-                : "bg-black disabled:opacity-50"
+              : "bg-black disabled:opacity-50"
           }`}
         >
           {optimizeButtonLabel}

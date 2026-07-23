@@ -443,6 +443,7 @@ export default function CategoryImageListing({
   const rows = categories.map((category) => ({
     image: mapCategoryToContextualImage(category),
     canOptimize: category.canOptimize,
+    hasImage: category.hasImage,
     // Eligible for any bulk action: can optimize OR can restore
     isEligibleForBulk:
       (category.canOptimize && category.hasImage && !category.isOptimized) ||
@@ -530,7 +531,7 @@ export default function CategoryImageListing({
             </div>
           ) : (
             <div className="space-y-3">
-              {rows.map(({ image, canOptimize, isEligibleForBulk }) => (
+              {rows.map(({ image, hasImage, isEligibleForBulk }) => (
                 <ContextualImageRow
                   key={image.key}
                   image={image}
@@ -538,7 +539,7 @@ export default function CategoryImageListing({
                   isBusy={Boolean(optimizingKeys[image.key])}
                   isRestoring={Boolean(restoringKeys[image.key])}
                   onSelect={isEligibleForBulk ? handleSelectRow : undefined}
-                  onOptimize={canOptimize ? handleOptimize : undefined}
+                  onOptimize={hasImage ? handleOptimize : undefined}
                   onRestore={image.isOptimized ? handleRestore : undefined}
                   onPreview={image.isOptimized ? handlePreview : undefined}
                 />
