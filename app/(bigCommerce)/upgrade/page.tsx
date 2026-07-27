@@ -1,6 +1,7 @@
 "use client";
 
 import { CHANNEL_CHANGED_EVENT } from "@/app/_lib/channelStorage";
+import ImageOptimizerAppHeader from "@/app/_components/imageOptimizerAppHeader";
 import Spinner from "@/app/_components/ui/Spinner";
 import { isApiFailure } from "../dashboard/_lib/apiUtils";
 import {
@@ -402,27 +403,31 @@ function UpgradePageContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-gray-500">
-        <Spinner size="sm" />
-        Loading plans…
+      <div>
+        <ImageOptimizerAppHeader
+          title="Upgrade your plan"
+          subtitle="Choose the plan that fits your store's image optimization needs."
+        />
+        <div className="flex min-h-[40vh] items-center justify-center gap-2 text-sm text-[#616161]">
+          <Spinner size="sm" />
+          Loading plans…
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 px-4 py-6 md:px-6">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {tab === "seoServices" ? "SEO Services" : "Upgrade your plan"}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {tab === "seoServices"
-              ? "Grow organic traffic with expert SEO support."
-              : "Choose the plan that fits your store's image optimization needs."}
-          </p>
-        </div>
+    <div className="pb-6">
+      <ImageOptimizerAppHeader
+        title={tab === "seoServices" ? "SEO Services" : "Upgrade your plan"}
+        subtitle={
+          tab === "seoServices"
+            ? "Grow organic traffic with expert SEO support."
+            : "Choose the plan that fits your store's image optimization needs."
+        }
+      />
 
+      <div>
         {tab === "seoServices" ? (
           <SeoServicesPanel />
         ) : (

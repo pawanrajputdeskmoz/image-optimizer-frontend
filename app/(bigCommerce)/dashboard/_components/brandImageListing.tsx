@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ExternalLink } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { isApiError, isApiFailure } from "../_lib/apiUtils";
@@ -32,10 +32,20 @@ const BRAND_PER_PAGE_OPTIONS = [5, 10, 50] as const;
 
 type BrandImageListingProps = {
   refreshNonce?: number;
+  headerSelectAllChecked?: boolean;
+  headerSelectAllSignal?: number;
+  onHeaderSelectAllStateChange?: (state: {
+    checked: boolean;
+    visible: boolean;
+    disabled: boolean;
+  }) => void;
 };
 
 export default function BrandImageListing({
   refreshNonce = 0,
+  headerSelectAllChecked = false,
+  headerSelectAllSignal = 0,
+  onHeaderSelectAllStateChange,
 }: BrandImageListingProps) {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,6 +82,22 @@ export default function BrandImageListing({
   const selectedRestoreCount = bulkRestoreEligible.filter((brand) =>
     selectedIds.has(brand.id),
   ).length;
+
+  useEffect(() => {
+    onHeaderSelectAllStateChange?.({
+      checked: allEligibleSelected,
+      visible: true,
+      disabled: bulkEligible.length === 0,
+    });
+  }, [allEligibleSelected, bulkEligible.length, onHeaderSelectAllStateChange]);
+
+  useEffect(() => {
+    setSelectedIds(
+      headerSelectAllChecked
+        ? new Set(bulkEligible.map((brand) => brand.id))
+        : new Set(),
+    );
+  }, [headerSelectAllChecked, headerSelectAllSignal, bulkEligible]);
 
   const loadBrands = useCallback(async (page: number, limit: number) => {
     setIsLoading(true);
@@ -395,31 +421,15 @@ export default function BrandImageListing({
 
       <div className="rounded-xl border bg-white">
         {bulkEligible.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 border-b px-4 py-2">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
-              <input
-                type="checkbox"
-                checked={allEligibleSelected}
-                onChange={(e) =>
-                  setSelectedIds(
-                    e.target.checked
-                      ? new Set(bulkEligible.map((brand) => brand.id))
-                      : new Set(),
-                  )
-                }
-                className="size-4 cursor-pointer accent-black"
-              />
-              Select all eligible ({bulkEligible.length})
-            </label>
-
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b px-4 py-2">
             {selectedIds.size > 0 ? (
-              <div className="ml-auto flex gap-2">
+              <div className="flex gap-2">
                 {selectedOptimizeCount > 0 ? (
                   <button
                     type="button"
                     disabled={isBulkOptimizing}
                     onClick={() => void handleBulkOptimize()}
-                    className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="custom-btn"
                   >
                     {isBulkOptimizing
                       ? "Optimizing…"
@@ -432,7 +442,7 @@ export default function BrandImageListing({
                     type="button"
                     disabled={isBulkRestoring}
                     onClick={() => void handleBulkRestore()}
-                    className="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn-default"
                   >
                     {isBulkRestoring
                       ? "Restoring…"
@@ -470,7 +480,7 @@ export default function BrandImageListing({
                 return (
                   <div
                     key={brand.id}
-                    className="flex items-center gap-4 rounded border bg-white p-3"
+                    className="flex items-center gap-3 rounded-[12px] border border-[rgba(0,0,0,0.08)] bg-[#F8FAFC] p-3"
                   >
                     {brand.hasImage ? (
                       <input
@@ -487,7 +497,7 @@ export default function BrandImageListing({
                             return next;
                           })
                         }
-                        className="size-4 shrink-0 cursor-pointer accent-black"
+                        className="size-4 shrink-0 rounded border-gray-300 cursor-pointer"
                         aria-label={`Select ${brand.name}`}
                       />
                     ) : null}
@@ -495,43 +505,70 @@ export default function BrandImageListing({
                     <Image
                       src={displayImageUrl}
                       alt={brand.name}
-                      width={56}
-                      height={56}
+                      width={40}
+                      height={40}
                       unoptimized
-                      className="size-14 rounded object-cover"
+                      className="size-10 rounded object-cover"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 text-sm font-medium">
-                        <span className="truncate">{brand.name}</span>
+                      <p className="mb-0 flex min-w-0 items-center gap-1.5 text-sm font-medium text-[#303030]">
+                        <span
+                          className="truncate text-[13px] font-medium text-[#303030]"
+                          title={brand.name}
+                        >
+                          {brand.name}
+                        </span>
                         {brand.storefrontUrl ? (
                           <a
                             href={brand.storefrontUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex shrink-0 text-gray-400 hover:text-gray-700"
+                            className="inline-flex shrink-0 text-[#9A9A9A] hover:text-[#303030]"
                             title="Open brand page"
                             aria-label={`Open ${brand.name} brand page`}
                           >
-                            <ExternalLink className="size-3.5" />
+                            <Image
+                              src="/images/link-icon.svg"
+                              alt=""
+                              width={14}
+                              height={14}
+                              unoptimized
+                              className="size-3.5"
+                            />
                           </a>
                         ) : null}
-                        <span className="shrink-0 font-normal text-gray-500">
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex rounded-[8px] bg-[#E0F0FF] px-2 py-0.5 text-xs font-medium text-[#00527C]">
                           {brand.sizeLabel}
                         </span>
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {brand.name} · Brand image
-                      </p>
+                        <span className="inline-flex rounded-[8px] bg-[#F1F1F1] px-2 py-0.5 text-xs font-medium text-[#616161]">
+                          Brand image
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       {isOptimized ? (
                         <button
                           type="button"
                           onClick={() => setPreviewBrand(brand)}
-                          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+                          className="inline-flex size-8 items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA]"
+                          aria-label="Preview"
+                          title="Preview"
                         >
-                          Preview
+                          <Eye className="size-4" />
+                        </button>
+                      ) : null}
+
+                      {isOptimized ? (
+                        <button
+                          type="button"
+                          disabled={isRestoring}
+                          onClick={() => void handleRestore(brand)}
+                          className="btn-default"
+                        >
+                          {isRestoring ? "Restoring…" : "Restore"}
                         </button>
                       ) : null}
 
@@ -539,25 +576,12 @@ export default function BrandImageListing({
                         type="button"
                         disabled={isOptimizeDisabled}
                         onClick={() => void handleOptimize(brand)}
-                        className={`rounded px-3 py-2 text-sm text-white disabled:cursor-not-allowed ${
-                          !brand.hasImage
-                            ? "bg-gray-400 opacity-80"
-                            : "bg-black disabled:opacity-50"
-                        }`}
+                        className={`${
+                          isOptimized ? "btn-default" : "custom-btn"
+                        } ${!brand.hasImage ? "!bg-[#9a9a9a] !shadow-none" : ""}`}
                       >
                         {optimizeButtonLabel}
                       </button>
-
-                      {isOptimized ? (
-                        <button
-                          type="button"
-                          disabled={isRestoring}
-                          onClick={() => void handleRestore(brand)}
-                          className="rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {isRestoring ? "Restoring…" : "Restore"}
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                 );

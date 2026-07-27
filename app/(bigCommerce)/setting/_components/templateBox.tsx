@@ -69,12 +69,12 @@ export default function TemplateBox({
   };
 
   return (
-    <div className="bg-white border rounded-xl shadow-sm p-4 space-y-4">
+    <div className="card space-y-4 !mb-0">
       <div className="flex justify-between items-start">
         <div>
-          <h3 className="font-semibold text-gray-800">{title}</h3>
+          <h3 className="text-base font-bold text-[#303030] mb-0">{title}</h3>
           {description && (
-            <p className="text-xs text-gray-500 mt-1">{description}</p>
+            <p className="text-xs text-[#616161] mt-1 font-normal mb-0">{description}</p>
           )}
         </div>
 
@@ -128,8 +128,8 @@ export default function TemplateBox({
             type="button"
             key={v}
             onClick={() => addToken(v)}
-            className={`text-xs border px-2 py-1 rounded ${
-              enabled ? "hover:bg-gray-100" : "cursor-not-allowed opacity-60"
+            className={`btn-default !h-auto !py-1 ${
+              enabled ? "" : "cursor-not-allowed opacity-60"
             }`}
             disabled={!enabled}
           >

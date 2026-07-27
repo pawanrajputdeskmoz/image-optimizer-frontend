@@ -1,9 +1,13 @@
 "use client";
 
-export default function Upgrade() {
+import Link from "next/link";
+
+export default function UpgradeButton() {
   return (
-    <span className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600">
-      Plan
-    </span>
+    <Link href="/upgrade" className="headBtn-link">
+      <button type="button" className="custom-btn">
+        Upgrade
+      </button>
+    </Link>
   );
 }

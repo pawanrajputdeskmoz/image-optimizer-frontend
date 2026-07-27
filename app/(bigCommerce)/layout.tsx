@@ -4,7 +4,7 @@ export default function BigCommerceLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+    <div className="min-h-screen">
       <main>{children}</main>
     </div>
   );

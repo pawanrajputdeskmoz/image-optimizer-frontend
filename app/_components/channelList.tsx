@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { fetchChannelsOnce } from "@/app/_lib/channelsCache";
 import {
   dispatchChannelChanged,
@@ -10,7 +11,6 @@ import {
   type ApiChannel,
   type StoredChannel,
 } from "@/app/_lib/channelStorage";
-import { ExternalLink } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { memo, useEffect, useRef, useState, type ChangeEvent } from "react";
 
@@ -46,6 +46,12 @@ function resolveInitialChannel(
   return channels[0] ? toStoredChannel(channels[0]) : null;
 }
 
+function channelDisplayName(channel?: ApiChannel | null) {
+  if (!channel) return "";
+  const raw = channel.url || channel.name || "";
+  return raw.replace(/^https?:\/\//, "");
+}
+
 function ChannelSelect() {
   const pathname = usePathname();
   const hasFetchedRef = useRef(false);
@@ -55,8 +61,6 @@ function ChannelSelect() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Install flow stores api-token asynchronously; skip until token exists
-    // so we don't hit settings/channels without Authorization.
     if (pathname === "/install") {
       return;
     }
@@ -149,63 +153,69 @@ function ChannelSelect() {
   }
 
   const selectedChannel = channels.find((item) => item.id === channelId);
+  const displayText = channelDisplayName(selectedChannel);
+  const storefrontUrl = selectedChannel?.url;
 
   if (isLoading) {
     return (
-      <div className="relative z-20 min-w-[220px] rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-500 shadow-sm">
-        Loading channels…
+      <div className="custom-dropi link-iconDropi headChannel-dropi flex-1 lg:flex-none lg:w-[240px]">
+        <span className="dropiLabel">Channel</span>
+        <div className="relative w-full overflow-hidden">
+          <select
+            className="form-select"
+            disabled
+            aria-label="Loading channels"
+          >
+            <option>Loading…</option>
+          </select>
+        </div>
       </div>
     );
   }
 
   if (!channels.length) {
     return (
-      <div className="relative z-20 flex min-w-[240px] flex-col gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 shadow-sm">
-        <span>{loadError ?? "No channels available"}</span>
+      <div className="custom-dropi link-iconDropi headChannel-dropi flex-1 lg:flex-none lg:w-[240px]">
+        <span className="dropiLabel">Channel</span>
+        <div className="relative w-full overflow-hidden">
+          <select className="form-select" disabled aria-label="No channels">
+            <option>{loadError ?? "No channels available"}</option>
+          </select>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="relative z-20 flex min-w-[240px] flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <label htmlFor="channel-select" className="text-xs font-medium text-gray-600">
-          Channel
-        </label>
-        {selectedChannel?.url ? (
-          <a
-            href={selectedChannel.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800"
-            title="Open channel storefront"
-          >
-            <ExternalLink className="size-3.5" />
-            Open
+    <div className="custom-dropi link-iconDropi headChannel-dropi flex-1 lg:flex-none lg:w-[240px]">
+      <span className="dropiLabel">
+        Channel
+        {storefrontUrl ? (
+          <a href={storefrontUrl} target="_blank" rel="noopener noreferrer">
+            <Image
+              src="/images/link-icon.svg"
+              alt=""
+              width={20}
+              height={20}
+            />
           </a>
         ) : null}
+      </span>
+      <div className="relative w-full overflow-hidden">
+        <select
+          className="form-select"
+          aria-label="Select channel"
+          onChange={handleChange}
+          value={String(channelId)}
+          title={displayText}
+        >
+          {channels.map((item) => (
+            <option key={item.id} value={String(item.id)}>
+              {channelDisplayName(item) || item.name}
+            </option>
+          ))}
+        </select>
       </div>
-
-      <select
-        id="channel-select"
-        aria-label="Select channel"
-        className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm"
-        value={String(channelId)}
-        onChange={handleChange}
-        title={selectedChannel?.name}
-      >
-        {channels.map((item) => (
-          <option key={item.id} value={String(item.id)}>
-            {item.name}
-          </option>
-        ))}
-      </select>
-
-      {loadError ? (
-        <p className="text-xs text-amber-700" role="status">
-          {loadError}
-        </p>
-      ) : null}
     </div>
   );
 }

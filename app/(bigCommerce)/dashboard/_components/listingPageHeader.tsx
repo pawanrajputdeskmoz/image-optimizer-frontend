@@ -25,7 +25,7 @@ export default function ListingPageHeader({
           <h1 className={`text-lg font-semibold ${listingTheme.textPrimary}`}>
             Product Image Optimization
           </h1>
-          <p className={`mt-1 max-w-2xl text-sm ${listingTheme.textSecondary}`}>
+          <p className={`text-sm ${listingTheme.textSecondary}`}>
             Optimize images and alt text based on your settings. Restore anytime
             within 30 days.
           </p>

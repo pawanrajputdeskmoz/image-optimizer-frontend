@@ -188,7 +188,7 @@ export default function PreviewModal({
         <div className="flex justify-end border-t px-3 py-2">
           <button
             type="button"
-            className="rounded bg-black px-3 py-1.5 text-xs text-white hover:bg-gray-900"
+            className="custom-btn !text-xs"
             onClick={() => {
               RestoreOptimizeImage();
               onHide();

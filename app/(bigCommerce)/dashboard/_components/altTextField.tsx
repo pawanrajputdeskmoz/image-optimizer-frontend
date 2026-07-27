@@ -18,15 +18,15 @@ export default function AltTextField({
   onSave,
 }: AltTextFieldProps) {
   return (
-    <div className="relative mt-2">
+    <div className="custom-input relative">
       <input
         type="text"
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Enter alt text"
-        className={`w-full rounded border py-2 pl-3 text-sm disabled:cursor-not-allowed disabled:bg-gray-50 ${
-          showSave ? "pr-[4.75rem]" : "pr-3"
+        placeholder="alt text here"
+        className={`form-control ${
+          showSave ? "pr-[4.75rem]" : ""
         }`}
       />
 
@@ -35,7 +35,7 @@ export default function AltTextField({
           type="button"
           disabled={disabled || isSaving}
           onClick={onSave}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded bg-black px-2.5 py-1 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 custom-btn !h-6 !px-2.5 !text-[11px]"
         >
           {isSaving ? "Saving…" : "Save"}
         </button>

@@ -26,6 +26,13 @@ const CATEGORY_PER_PAGE_OPTIONS = [5, 10, 50] as const;
 
 type CategoryImageListingProps = {
   refreshNonce?: number;
+  headerSelectAllChecked?: boolean;
+  headerSelectAllSignal?: number;
+  onHeaderSelectAllStateChange?: (state: {
+    checked: boolean;
+    visible: boolean;
+    disabled: boolean;
+  }) => void;
 };
 
 function readStoreHash(): string {
@@ -42,6 +49,9 @@ function readStoreHash(): string {
 
 export default function CategoryImageListing({
   refreshNonce = 0,
+  headerSelectAllChecked = false,
+  headerSelectAllSignal = 0,
+  onHeaderSelectAllStateChange,
 }: CategoryImageListingProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -308,6 +318,22 @@ export default function CategoryImageListing({
     [bulkEligible],
   );
 
+  useEffect(() => {
+    onHeaderSelectAllStateChange?.({
+      checked: allEligibleSelected,
+      visible: true,
+      disabled: bulkEligible.length === 0,
+    });
+  }, [
+    allEligibleSelected,
+    bulkEligible.length,
+    onHeaderSelectAllStateChange,
+  ]);
+
+  useEffect(() => {
+    handleSelectAll(headerSelectAllChecked);
+  }, [headerSelectAllChecked, headerSelectAllSignal, handleSelectAll]);
+
   const handleBulkOptimize = useCallback(async () => {
     // Build payload: only selected categories that have an image and are not yet optimized
     const items: CategoryBulkOptimizeItem[] = categories
@@ -481,25 +507,15 @@ export default function CategoryImageListing({
       <div className="rounded-xl border bg-white">
         {/* Bulk-action toolbar */}
         {bulkEligible.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 border-b px-4 py-2">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 select-none">
-              <input
-                type="checkbox"
-                checked={allEligibleSelected}
-                onChange={(e) => handleSelectAll(e.target.checked)}
-                className="size-4 cursor-pointer accent-black"
-              />
-              Select all eligible ({bulkEligible.length})
-            </label>
-
+          <div className="flex flex-wrap items-center justify-end gap-3 border-b px-4 py-2">
             {selectedIds.size > 0 ? (
-              <div className="ml-auto flex gap-2">
+              <div className="flex gap-2">
                 {selectedOptimizeCount > 0 ? (
                   <button
                     type="button"
                     disabled={isBulkOptimizing}
                     onClick={handleBulkOptimize}
-                    className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="custom-btn"
                   >
                     {isBulkOptimizing
                       ? "Optimizing…"
@@ -512,7 +528,7 @@ export default function CategoryImageListing({
                     type="button"
                     disabled={isBulkRestoring}
                     onClick={handleBulkRestore}
-                    className="rounded border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="btn-default"
                   >
                     {isBulkRestoring
                       ? "Restoring…"

@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import ChannelSelect from "@/app/_components/channelList";
 import Sidebar from "@/app/_components/sidebar";
 import ReduxProvider from "@/app/store/provider";
 
@@ -15,13 +14,10 @@ export default function AppChrome({ children }: { children: ReactNode }) {
   }
 
   return (
-    <section className="frame-area bg-zinc-50">
+    <section className="frame-area bg-[#F1F1F1]">
       <div className="flex">
         <Sidebar />
-        <div className="flex min-h-full w-full flex-1 flex-col !p-6">
-          <div className="relative z-20 mb-4 flex shrink-0 justify-end">
-            <ChannelSelect />
-          </div>
+        <div className="frame-main flex-1">
           <ReduxProvider>{children}</ReduxProvider>
         </div>
       </div>

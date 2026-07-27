@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ExternalLink } from "lucide-react";
+import { Eye } from "lucide-react";
 
 import {
   getCategoryOptimizeButtonLabel,
@@ -62,10 +62,10 @@ export default function ContextualImageRow({
 
   return (
     <div
-      className={`flex items-center gap-4 rounded border p-3 transition-all ${
+      className={`flex items-center gap-3 rounded-[12px] border border-[rgba(0,0,0,0.08)] bg-[#F8FAFC] p-3 transition-all ${
         isSelected
-          ? "border-blue-500 bg-blue-100"
-          : "bg-white"
+          ? "bg-[#FAFAFA]"
+          : ""
       }`}
     >
       {onSelect ? (
@@ -73,7 +73,7 @@ export default function ContextualImageRow({
           type="checkbox"
           checked={isSelected}
           onChange={(e) => onSelect(image, e.target.checked)}
-          className="size-4 shrink-0 cursor-pointer accent-black"
+          className="size-4 shrink-0 rounded border-gray-300 cursor-pointer"
           aria-label={`Select ${image.fileName}`}
         />
       ) : null}
@@ -82,15 +82,15 @@ export default function ContextualImageRow({
         <Image
           src={image.url || PLACEHOLDER_IMAGE}
           alt={image.fileName}
-          width={56}
-          height={56}
+          width={40}
+          height={40}
           unoptimized
-          className="size-14 rounded object-cover"
+          className="size-10 rounded object-cover"
         />
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-sm font-medium">
+        <p className="mb-0 flex min-w-0 items-center gap-1.5 text-sm font-medium text-[#303030]">
           {carouselLimited && image.sourceType !== "category" ? (
             <span
               className="shrink-0 font-semibold text-amber-600"
@@ -100,41 +100,73 @@ export default function ContextualImageRow({
               *
             </span>
           ) : null}
-          <span className="truncate">{image.fileName}</span>
+          <span
+            className="truncate text-[13px] font-medium text-[#303030]"
+            title={image.fileName}
+          >
+            {image.fileName}
+          </span>
           {image.url && image.url !== PLACEHOLDER_IMAGE ? (
             <a
               href={image.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex shrink-0 text-gray-400 hover:text-gray-700"
+              className="inline-flex shrink-0 text-[#9A9A9A] hover:text-[#303030]"
               title="Open image in new tab"
               aria-label={`Open ${image.fileName} in new tab`}
             >
-              <ExternalLink className="size-3.5" />
+              <Image
+                src="/images/link-icon.svg"
+                alt=""
+                width={14}
+                height={14}
+                unoptimized
+                className="size-3.5"
+              />
             </a>
           ) : null}
-          <span className="shrink-0 font-normal text-gray-500">
-            {image.sizeLabel}
-          </span>
         </p>
 
-        {subtitle ? (
-          <p className="mt-1 truncate text-sm text-gray-600">{subtitle}</p>
-        ) : null}
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex rounded-[8px] bg-[#E0F0FF] px-2 py-0.5 text-xs font-medium text-[#00527C]">
+            {image.sizeLabel || "—"}
+          </span>
+          {subtitle ? (
+            <span
+              className="inline-flex rounded-[8px] bg-[#F1F1F1] px-2 py-0.5 text-xs font-medium text-[#616161]"
+              title={subtitle}
+            >
+              <span className="truncate max-w-[220px]">{subtitle}</span>
+            </span>
+          ) : null}
+        </div>
 
         {image.errorMessage ? (
           <p className="mt-1 text-xs text-red-600">{image.errorMessage}</p>
         ) : null}
       </div>
 
-      <div className="flex shrink-0 gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         {image.isOptimized && onPreview ? (
           <button
             type="button"
             onClick={() => onPreview(image)}
-            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA]"
+            aria-label="Preview"
+            title="Preview"
           >
-            Preview
+            <Eye className="size-4" />
+          </button>
+        ) : null}
+
+        {image.isOptimized && onRestore ? (
+          <button
+            type="button"
+            disabled={isRestoring}
+            onClick={() => onRestore(image)}
+            className="btn-default"
+          >
+            {isRestoring ? "Restoring…" : "Restore"}
           </button>
         ) : null}
 
@@ -150,25 +182,16 @@ export default function ContextualImageRow({
                 : undefined
           }
           onClick={() => onOptimize?.(image)}
-          className={`rounded px-3 py-2 text-sm text-white disabled:cursor-not-allowed ${
+          className={`${
+            image.isOptimized ? "btn-default" : "custom-btn"
+          } ${
             image.sourceType === "category" && image.status === "no_image"
-              ? "bg-gray-400 opacity-80"
-              : "bg-black disabled:opacity-50"
+              ? "!bg-[#9a9a9a] !shadow-none"
+              : ""
           }`}
         >
           {optimizeButtonLabel}
         </button>
-
-        {image.isOptimized && onRestore ? (
-          <button
-            type="button"
-            disabled={isRestoring}
-            onClick={() => onRestore(image)}
-            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isRestoring ? "Restoring…" : "Restore"}
-          </button>
-        ) : null}
       </div>
     </div>
   );

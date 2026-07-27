@@ -135,7 +135,7 @@ export default function CategoryImageCompareModal({
         <button
           type="button"
           onClick={onClose}
-          className="rounded bg-black px-4 py-2 text-sm text-white"
+          className="custom-btn"
         >
           Close
         </button>

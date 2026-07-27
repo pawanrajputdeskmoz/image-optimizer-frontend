@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 type ListingPaginationProps = {
@@ -12,6 +13,8 @@ type ListingPaginationProps = {
   perPageOptions?: number[];
   onPerPageChange?: (perPage: number) => void;
   perPageLabel?: string;
+  totalItems?: number;
+  itemLabel?: string;
 };
 
 export default function ListingPagination({
@@ -23,11 +26,12 @@ export default function ListingPagination({
   perPage,
   perPageOptions,
   onPerPageChange,
-  perPageLabel = "Per page",
+  perPageLabel = "per page",
+  totalItems,
+  itemLabel = "items",
 }: ListingPaginationProps) {
   const [pageInput, setPageInput] = useState(String(currentPage));
   const perPageSelectId = useId();
-  const pageJumpId = useId();
   const showPerPage =
     typeof perPage === "number" &&
     Array.isArray(perPageOptions) &&
@@ -55,87 +59,79 @@ export default function ListingPagination({
 
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 ${className}`.trim()}
+      className={`flex flex-wrap items-center justify-center gap-3 text-sm text-[#616161] ${className}`.trim()}
     >
-      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+      <button
+        type="button"
+        onClick={() => goToPage(currentPage - 1)}
+        disabled={currentPage === 1 || disabled}
+        className="inline-flex size-8 items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Previous page"
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          min={1}
+          max={totalPages}
+          value={pageInput}
+          onChange={(e) => setPageInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submitJump();
+          }}
+          onBlur={submitJump}
+          disabled={controlsDisabled}
+          className="io-input w-12 !h-8 text-center"
+          aria-label="Page number"
+        />
         <span>
-          Page {currentPage} of {totalPages}
+          / {totalPages}
+          {typeof totalItems === "number" ? (
+            <>
+              {" "}
+              of {totalItems} {itemLabel}
+            </>
+          ) : null}
         </span>
-
-        {showPerPage ? (
-          <div className="flex items-center gap-1.5">
-            <label htmlFor={perPageSelectId} className="whitespace-nowrap">
-              {perPageLabel}
-            </label>
-            <select
-              id={perPageSelectId}
-              value={perPage}
-              disabled={disabled}
-              onChange={(e) => {
-                const next = Number.parseInt(e.target.value, 10);
-                if (!Number.isFinite(next) || next === perPage) return;
-                onPerPageChange(next);
-              }}
-              className="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label={perPageLabel}
-            >
-              {perPageOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => goToPage(currentPage - 1)}
-          disabled={currentPage === 1 || controlsDisabled}
-          className="rounded border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Prev
-        </button>
-
-        <button
-          type="button"
-          onClick={() => goToPage(currentPage + 1)}
-          disabled={currentPage === totalPages || controlsDisabled}
-          className="rounded border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Next
-        </button>
-
-        <div className="flex items-center gap-1.5 text-sm text-gray-600">
-          <label htmlFor={pageJumpId} className="whitespace-nowrap">
-            Go to
+      {showPerPage ? (
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={perPageSelectId} className="whitespace-nowrap">
+            {perPageLabel}
           </label>
-          <input
-            id={pageJumpId}
-            type="number"
-            min={1}
-            max={totalPages}
-            value={pageInput}
-            onChange={(e) => setPageInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submitJump();
+          <select
+            id={perPageSelectId}
+            value={perPage}
+            disabled={disabled}
+            onChange={(e) => {
+              const next = Number.parseInt(e.target.value, 10);
+              if (!Number.isFinite(next) || next === perPage) return;
+              onPerPageChange(next);
             }}
-            disabled={controlsDisabled}
-            className="w-16 rounded border border-gray-300 px-2 py-1.5 text-center text-sm outline-none focus:border-gray-500 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Page number"
-          />
-          <button
-            type="button"
-            onClick={submitJump}
-            disabled={controlsDisabled}
-            className="rounded border px-3 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="io-input !h-8 !py-0 w-16"
+            aria-label={perPageLabel}
           >
-            Go
-          </button>
+            {perPageOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => goToPage(currentPage + 1)}
+        disabled={currentPage === totalPages || disabled}
+        className="inline-flex size-8 items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA] disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Next page"
+      >
+        <ChevronRight className="size-4" />
+      </button>
     </div>
   );
 }

@@ -10,9 +10,380 @@ html, body {
 }
 
 body {
-  background-color: rgb(243 244 246);
-  color: rgb(31 41 55);
-  font-family: system-ui, -apple-system, sans-serif;
+  background: #F1F1F1;
+  color: #303030;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+p {
+  color: #616161;
+}
+
+.Text--heading3xl {
+  font-size: 2.25rem;
+  font-weight: 700;
+}
+
+.Text--heading2xl {
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+
+.Text--headingXl {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.Text--headingLg {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #303030;
+}
+
+.Text--headingMd {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.Text--headingSm {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.Text--headingXs {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.text-subbed {
+  color: #939393 !important;
+}
+
+/* Cards — match SEOKart BigCommerce (Bootstrap card border + soft shadow) */
+.card {
+  background-color: #fff;
+  border-radius: 12px;
+  text-decoration: none;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  box-shadow: 0 2px 0 0 rgba(26,26,26,.07),inset 0 0 0 0 hsla(0,0%,80%,.5),inset 0 0 0 0 rgba(0,0,0,.17),inset 0 0 0 0 rgba(0,0,0,.13),inset 0 0 0 0 rgba(0,0,0,.13);
+  margin-bottom: 24px;
+}
+
+.cardHeader h3,
+.card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #303030;
+  margin: 0;
+}
+
+.cardHeader p,
+.card-subtitle {
+  font-size: 0.75rem;
+  color: #616161;
+  margin-top: 0.125rem;
+  font-weight: 400;
+}
+
+/* Primary dark button (Upgrade style) */
+.custom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  background: #3F3F3F;
+  border: none;
+  box-shadow:
+    0px 1px 0px 0px #000 inset,
+    0px 0px 0px 1px #000 inset,
+    -2px 0px 0px 0px rgba(255, 255, 255, 0.20) inset,
+    2px 0px 0px 0px rgba(255, 255, 255, 0.20) inset,
+    1px 2px 0px 0px rgba(255, 255, 255, 0.20) inset;
+  height: 28px;
+  color: #fff;
+  padding: 5px 12px;
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1.2;
+}
+
+.custom-btn:hover {
+  background: #2f2f2f;
+  color: #fff;
+}
+
+.custom-btn:disabled,
+.custom-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #4b71fc;
+  border: none;
+  height: 28px;
+  color: #fff;
+  padding: 5px 12px;
+  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: #6f8dfd;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secondary / outline button */
+.btn-default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 8px;
+  background: #fff;
+  border: none;
+  box-shadow:
+    0rem -0.0625rem 0rem 0rem #b5b5b5 inset,
+    0rem 0rem 0rem 0.0625rem rgba(0, 0, 0, 0.1) inset,
+    0rem 0.03125rem 0rem 0.09375rem #fff inset;
+  height: 28px;
+  padding: 4px 12px;
+  font-weight: 500;
+  font-size: 12px;
+  color: #303030;
+  white-space: nowrap;
+  cursor: pointer;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.btn-default:hover {
+  background: #fafafa;
+}
+
+.btn-default:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-default.active,
+.btn-default.is-active {
+  background: #3F3F3F;
+  color: #fff;
+  box-shadow:
+    0px 1px 0px 0px #000 inset,
+    0px 0px 0px 1px #000 inset,
+    -2px 0px 0px 0px rgba(255, 255, 255, 0.20) inset,
+    2px 0px 0px 0px rgba(255, 255, 255, 0.20) inset,
+    1px 2px 0px 0px rgba(255, 255, 255, 0.20) inset;
+}
+
+.btn.btn-light.dashLinkBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #d1d1d1;
+  border-radius: 8px;
+  padding: 0px 8px 2px;
+  height: 28px;
+  min-width: 28px;
+  cursor: pointer;
+}
+
+.btn.btn-light.dashLinkBtn:hover {
+  background: #fafafa;
+}
+
+/* Channel dropdown — match SEOKart BigCommerce */
+.custom-dropi {
+  position: relative;
+}
+
+.custom-dropi span,
+.custom-dropi .dropiLabel {
+  background: #fff;
+  padding: 0 6px;
+  font-weight: 500;
+  font-size: 12px;
+  position: absolute;
+  left: 9px;
+  top: -9px;
+  z-index: 1;
+  color: #616161;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.headChannel-dropi.custom-dropi span,
+.headChannel-dropi.custom-dropi .dropiLabel,
+.dropiLabel {
+  background: linear-gradient(#F1F1F1, #fff) !important;
+  color: #616161 !important;
+}
+
+.custom-dropi select,
+.custom-dropi .form-select {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #303030;
+  background-color: #FDFDFD;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23303030' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 12px 10px;
+  border: 0.66px solid #8A8A8A;
+  border-radius: 0.375rem;
+  height: 32px;
+  padding: 5px 33px 5px 13px;
+  width: 100%;
+  max-width: 100%;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.headChannel-dropi.custom-dropi {
+  max-width: 240px;
+  width: 240px;
+}
+
+.headChannel-dropi.custom-dropi select,
+.headChannel-dropi.custom-dropi .form-select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  width: 100%;
+  padding-right: 30px;
+  direction: ltr;
+}
+
+.custom-dropi select:focus,
+.custom-dropi .form-select:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: #8A8A8A;
+}
+
+.custom-dropi select:disabled,
+.custom-dropi .form-select:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.link-iconDropi img {
+  margin-left: 2px;
+  width: 16px;
+  height: 16px;
+  margin-top: -4px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.link-iconDropi a {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.frame-main {
+  padding: 0 20px;
+}
+
+.content-frameHead-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Image optimizer product images table — SEOKart custom-table look */
+.io-image-table.custom-table {
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+}
+
+.io-image-table.custom-table table.table {
+  margin-bottom: 0;
+}
+
+.io-image-table.custom-table thead tr th {
+  background: #f7f7f7;
+  font-size: 12px;
+  font-weight: 600;
+  color: #303030;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.io-image-table.custom-table thead tr th:first-child {
+  border-radius: 10px 0 0 0;
+}
+
+.io-image-table.custom-table thead tr th:last-child {
+  border-radius: 0 10px 0 0;
+  text-align: right;
+  padding-right: 16px;
+}
+
+.io-image-table.custom-table tbody tr td {
+  vertical-align: middle;
+  font-size: 13px;
+  color: #303030;
+}
+
+.io-image-table.custom-table tbody tr td:last-child {
+  text-align: right;
+  padding-right: 16px;
+}
+
+.io-image-table.custom-table tbody tr:last-child td:first-child {
+  border-radius: 0 0 0 10px;
+}
+
+.io-image-table.custom-table tbody tr:last-child td:last-child {
+  border-radius: 0 0 10px 0;
+}
+
+/* Form inputs matching SEOKart density */
+.io-input {
+  font-size: 12px;
+  font-weight: 400;
+  color: #303030;
+  background-color: #FDFDFD;
+  border: 0.66px solid #8A8A8A;
+  border-radius: 4px;
+  height: 32px;
+  padding: 5px 13px;
+}
+
+.io-input:focus {
+  outline: none;
+  border-color: #8A8A8A;
+  box-shadow: none;
 }
 
 .align-item-center {
@@ -193,38 +564,38 @@ body {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #F1F1F1;
+  --foreground: #303030;
+  --card: #ffffff;
+  --card-foreground: #303030;
+  --popover: #ffffff;
+  --popover-foreground: #303030;
+  --primary: #3F3F3F;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #303030;
+  --muted: #f5f5f5;
+  --muted-foreground: #616161;
+  --accent: #f5f5f5;
+  --accent-foreground: #303030;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #e5e5e5;
+  --input: #8A8A8A;
+  --ring: #8A8A8A;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.5rem;
+  --sidebar: #ebebeb;
+  --sidebar-foreground: #303030;
+  --sidebar-primary: #3F3F3F;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f1f1f1;
+  --sidebar-accent-foreground: #303030;
+  --sidebar-border: #d9d9d9;
+  --sidebar-ring: #8A8A8A;
 }
 
 .dark {
@@ -266,10 +637,14 @@ body {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background: #F1F1F1;
+    color: #303030;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
   }
   html {
-    @apply font-sans;
+    font-family: 'Inter', sans-serif;
   }
 }
 
@@ -286,4 +661,18 @@ body {
 .image-compare-root [data-testid="container"] img {
   will-change: clip-path;
   -webkit-user-drag: none;
+}
+
+.custom-input .form-control {
+  font-size: 12px;
+  font-weight: 400;
+  padding: 6px 13px;
+  background: #fdfdfd;
+  border: .66px solid #8a8a8a;
+  border-radius: 6px;
+}
+
+.custom-input .form-control:focus {
+  outline: none;
+  box-shadow: none;
 }

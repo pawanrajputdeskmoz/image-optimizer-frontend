@@ -10,6 +10,8 @@ export type ImageItem = {
   optimized?: boolean;
   /** From API when image is already optimized or after successful optimization */
   optimizationStatus?: string;
+  /** Compression savings when known (e.g. 50) */
+  savedPercent?: number | null;
   isThumbnail?: boolean;
   sortOrder?: number;
 };
@@ -704,6 +706,12 @@ export type DashboardStatCard = {
   subtitle: string;
 };
 
+export type ActiveBulkFlags = {
+  product?: boolean;
+  category?: boolean;
+  brand?: boolean;
+};
+
 export type ClientDashboardStatsData = {
   pending_images: DashboardStatCard;
   pending_restore_images?: DashboardStatCard;
@@ -719,6 +727,8 @@ export type ClientDashboardStatsData = {
     subtitle: string;
   };
   active_job?: boolean;
+  active_bulk_jobs?: ActiveBulkFlags;
+  active_bulk_restores?: ActiveBulkFlags;
   failed_images?: number;
   average_saving_percent?: number;
   last_optimized_at?: string | null;

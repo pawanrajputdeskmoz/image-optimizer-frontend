@@ -215,6 +215,10 @@ export function applyOptimizationResult(
     sizeLabel,
     optimized: true,
     optimizationStatus: "optimized",
+    savedPercent:
+      typeof data.optimizedImage?.compression?.savedPercent === "number"
+        ? data.optimizedImage.compression.savedPercent
+        : image.savedPercent ?? null,
   };
 }
 
@@ -289,6 +293,7 @@ export function applyRestoreResult(
     sizeLabel: resolveRestoredSizeLabel(image, data),
     optimized: false,
     optimizationStatus: undefined,
+    savedPercent: null,
   };
 }
 
