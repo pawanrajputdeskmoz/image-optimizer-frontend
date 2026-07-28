@@ -32,21 +32,21 @@ export default function OptimizationSettingsDialog({
       <DialogTrigger className={triggerClassName}>
         Optimization Setting
       </DialogTrigger>
-      <DialogContent className="flex max-h-[90vh] w-full max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-        <DialogHeader className="border-b border-[#ebebeb] px-6 py-4">
-          <DialogTitle className="text-base font-bold text-[#303030]">
+      <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogHeader className="border-b border-gray-100 px-5 py-4">
+          <DialogTitle className="text-base font-bold text-gray-900">
             Optimization Settings
           </DialogTitle>
-          <DialogDescription className="text-[13px] text-[#616161]">
+          <DialogDescription className="text-[13px] text-gray-500">
             Configure filename, alt text, and compression preferences.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto px-5 py-4">
           <OptimizationSettingsForm settings={settings} />
         </div>
 
-        <DialogFooter className="mx-0 mb-0 border-t border-[#ebebeb] bg-[#fafafa] px-6 py-4 sm:justify-end">
+        <DialogFooter className="mx-0 mb-0 border-t border-gray-100 bg-gray-50 px-5 py-4 sm:justify-end">
           <SettingsSaveActions
             settings={settings}
             buttonClassName="custom-btn min-w-32"

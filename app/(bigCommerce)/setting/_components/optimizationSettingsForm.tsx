@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MutableRefObject,
-} from "react";
-import { ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiCall } from "@/app/_api/apiCall";
@@ -17,23 +11,64 @@ import {
 } from "@/app/_lib/channelStorage";
 import { isApiError, isApiFailure } from "../../dashboard/_lib/apiUtils";
 import TemplateBox from "./templateBox";
-import CruiseControlSwitch from "./cruiseControlSwitch";
 import {
   COMPRESSION_PRESET_ORDER,
   COMPRESSION_RANGES,
   FORMAT_OPTIONS,
+  QUALITY_MAX,
+  QUALITY_MIN,
   applyDefaults,
   clampQuality,
   getActivePreset,
+  getPresetBadgeLabel,
   parseSettings,
   sliderFillPercent,
   type SettingsRow,
-  zoneWidthPercent,
 } from "../_lib/optimizationSettingsUtils";
 
 type UseOptimizationSettingsOptions = {
   enabled?: boolean;
 };
+
+function ToggleSwitch({
+  enabled,
+  pending,
+  disabled,
+  onToggle,
+  label,
+}: {
+  enabled: boolean;
+  pending?: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-busy={pending}
+      aria-label={label}
+      disabled={disabled || pending}
+      onClick={onToggle}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${enabled ? "bg-[#155dfc]" : "bg-gray-300"
+        }`}
+    >
+      {pending ? (
+        <span
+          className="absolute left-1/2 top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-2 border-white/40 border-t-white"
+          aria-hidden
+        />
+      ) : (
+        <span
+          className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+        />
+      )}
+    </button>
+  );
+}
 
 export function useOptimizationSettings({
   enabled = true,
@@ -57,20 +92,18 @@ export function useOptimizationSettings({
   const activePreset = getActivePreset(quality);
   const [outputFormat, setOutputFormat] = useState<string>("webp");
   const [autoOptimize, setAutoOptimize] = useState(true);
-  const [autoOptimizeCategory, setAutoOptimizeCategory] = useState(false);
-  const [webhookTogglePending, setWebhookTogglePending] = useState(false);
-  const [categoryWebhookTogglePending, setCategoryWebhookTogglePending] =
-    useState(false);
-  const webhookAbortRef = useRef<AbortController | null>(null);
-  const categoryWebhookAbortRef = useRef<AbortController | null>(null);
-  const webhookRequestIdRef = useRef(0);
-  const categoryWebhookRequestIdRef = useRef(0);
+  const [autoOptimizeCategory, setAutoOptimizeCategory] = useState(true);
+  const [cruiseControlPending, setCruiseControlPending] = useState(false);
+  const cruiseControlRequestIdRef = useRef(0);
+  const cruiseControlAbortRef = useRef<AbortController | null>(null);
 
+  const cruiseControlEnabled = autoOptimize && autoOptimizeCategory;
   const formatConversionEnabled = outputFormat !== "original";
 
   const formatRadioOptions = useMemo(() => {
     const known = FORMAT_OPTIONS.some((o) => o.id === outputFormat);
     if (known) return FORMAT_OPTIONS;
+    // Keep unknown server formats visible (e.g. legacy avif)
     return [
       ...FORMAT_OPTIONS,
       {
@@ -90,6 +123,7 @@ export function useOptimizationSettings({
     setQuality(row.image_quality);
     setOutputFormat(row.output_format);
     setAutoOptimize(row.auto_optimize_new_images);
+    setAutoOptimizeCategory(row.auto_optimize_new_category_images);
     setBaseline(row);
   }
 
@@ -102,8 +136,7 @@ export function useOptimizationSettings({
       baseline.is_alt_text_template_enabled !== isAltTextTemplateEnabled ||
       baseline.alt_text_template !== altTextTemplate ||
       baseline.image_quality !== quality ||
-      baseline.output_format !== outputFormat ||
-      baseline.auto_optimize_new_images !== autoOptimize
+      baseline.output_format !== outputFormat
     );
   }, [
     baseline,
@@ -114,7 +147,6 @@ export function useOptimizationSettings({
     altTextTemplate,
     quality,
     outputFormat,
-    autoOptimize,
   ]);
 
   async function load() {
@@ -159,115 +191,86 @@ export function useOptimizationSettings({
   }, [enabled]);
 
   useEffect(() => {
-    const productAbortRef = webhookAbortRef;
-    const categoryAbortRef = categoryWebhookAbortRef;
-
     return () => {
-      productAbortRef.current?.abort();
-      categoryAbortRef.current?.abort();
+      cruiseControlAbortRef.current?.abort();
     };
   }, []);
 
-  async function handleWebhookToggle({
-    path,
-    enabled: toggleEnabled,
-    setEnabled,
-    abortRef,
-    requestIdRef,
-    setPending,
-    fallbackMessages,
-    onSuccess,
-  }: {
-    path: string;
-    enabled: boolean;
-    setEnabled: (value: boolean) => void;
-    abortRef: MutableRefObject<AbortController | null>;
-    requestIdRef: MutableRefObject<number>;
-    setPending: (value: boolean) => void;
-    fallbackMessages: { on: string; off: string };
-    onSuccess?: (next: boolean) => void;
-  }) {
-    const next = !toggleEnabled;
-    const previous = toggleEnabled;
+  async function handleCruiseControlToggle() {
+    const next = !cruiseControlEnabled;
+    const previousProduct = autoOptimize;
+    const previousCategory = autoOptimizeCategory;
+    const requestId = ++cruiseControlRequestIdRef.current;
 
-    abortRef.current?.abort();
+    cruiseControlAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
-    const requestId = ++requestIdRef.current;
+    cruiseControlAbortRef.current = controller;
 
-    setEnabled(next);
-    setPending(true);
+    setAutoOptimize(next);
+    setAutoOptimizeCategory(next);
+    setCruiseControlPending(true);
 
     try {
-      const data = await ApiCall(
-        path,
-        {},
-        {
-          method: next ? "POST" : "DELETE",
-          signal: controller.signal,
-        },
-      );
+      const method = next ? "POST" : "DELETE";
+      const [productRes, categoryRes] = await Promise.all([
+        ApiCall(
+          "settings/webhooks/product-created",
+          {},
+          { method, signal: controller.signal },
+        ),
+        ApiCall(
+          "settings/webhooks/category-created",
+          {},
+          { method, signal: controller.signal },
+        ),
+      ]);
 
-      if (requestId !== requestIdRef.current) return;
-      if (data && typeof data === "object" && "aborted" in data) return;
-
-      if (isApiError(data) || isApiFailure(data as { success?: boolean })) {
-        setEnabled(previous);
+      if (requestId !== cruiseControlRequestIdRef.current) return;
+      if (
+        (productRes &&
+          typeof productRes === "object" &&
+          "aborted" in productRes) ||
+        (categoryRes &&
+          typeof categoryRes === "object" &&
+          "aborted" in categoryRes)
+      ) {
         return;
       }
 
-      const message =
-        data &&
-        typeof data === "object" &&
-        "message" in data &&
-        typeof (data as { message?: unknown }).message === "string"
-          ? (data as { message: string }).message
-          : next
-            ? fallbackMessages.on
-            : fallbackMessages.off;
+      const productFailed =
+        isApiError(productRes) ||
+        isApiFailure(productRes as { success?: boolean });
+      const categoryFailed =
+        isApiError(categoryRes) ||
+        isApiFailure(categoryRes as { success?: boolean });
 
-      onSuccess?.(next);
-      toast.success(message);
+      if (productFailed || categoryFailed) {
+        setAutoOptimize(previousProduct);
+        setAutoOptimizeCategory(previousCategory);
+        toast.error("Could not update Cruise Control");
+        return;
+      }
+
+      setBaseline((current) =>
+        current
+          ? {
+            ...current,
+            auto_optimize_new_images: next,
+            auto_optimize_new_category_images: next,
+          }
+          : current,
+      );
+
+      toast.success(
+        next
+          ? "Auto-optimize enabled for new product and category images"
+          : "Auto-optimize disabled for new product and category images",
+      );
     } finally {
-      if (requestId === requestIdRef.current) {
-        setPending(false);
+      if (requestId === cruiseControlRequestIdRef.current) {
+        setCruiseControlPending(false);
       }
     }
-  }
-
-  function handleAutoOptimizeToggle() {
-    void handleWebhookToggle({
-      path: "settings/webhooks/product-created",
-      enabled: autoOptimize,
-      setEnabled: setAutoOptimize,
-      abortRef: webhookAbortRef,
-      requestIdRef: webhookRequestIdRef,
-      setPending: setWebhookTogglePending,
-      fallbackMessages: {
-        on: "Auto-optimize enabled for new product images",
-        off: "Auto-optimize disabled for new product images",
-      },
-      onSuccess: (next) => {
-        setBaseline((current) =>
-          current ? { ...current, auto_optimize_new_images: next } : current,
-        );
-      },
-    });
-  }
-
-  function handleCategoryWebhookToggle() {
-    void handleWebhookToggle({
-      path: "settings/webhooks/category-created",
-      enabled: autoOptimizeCategory,
-      setEnabled: setAutoOptimizeCategory,
-      abortRef: categoryWebhookAbortRef,
-      requestIdRef: categoryWebhookRequestIdRef,
-      setPending: setCategoryWebhookTogglePending,
-      fallbackMessages: {
-        on: "Auto-optimize enabled for new category images",
-        off: "Auto-optimize disabled for new category images",
-      },
-    });
   }
 
   async function handleSave() {
@@ -282,6 +285,7 @@ export function useOptimizationSettings({
         image_quality: quality,
         output_format: outputFormat,
         auto_optimize_new_images: autoOptimize,
+        auto_optimize_new_category_images: autoOptimizeCategory,
       };
       const data = await ApiCall("settings", payload, {
         method: "PUT",
@@ -331,12 +335,9 @@ export function useOptimizationSettings({
     setIsAltTextTemplateEnabled,
     altTextTemplate,
     setAltTextTemplate,
-    autoOptimize,
-    webhookTogglePending,
-    handleAutoOptimizeToggle,
-    autoOptimizeCategory,
-    categoryWebhookTogglePending,
-    handleCategoryWebhookToggle,
+    cruiseControlEnabled,
+    cruiseControlPending,
+    handleCruiseControlToggle,
   };
 }
 
@@ -373,275 +374,212 @@ export function OptimizationSettingsForm({
     setIsAltTextTemplateEnabled,
     altTextTemplate,
     setAltTextTemplate,
-    autoOptimize,
-    webhookTogglePending,
-    handleAutoOptimizeToggle,
-    autoOptimizeCategory,
-    categoryWebhookTogglePending,
-    handleCategoryWebhookToggle,
+    cruiseControlEnabled,
+    cruiseControlPending,
+    handleCruiseControlToggle,
   } = settings;
+
+  const fillPercent = sliderFillPercent(quality);
 
   return (
     <div className={className ?? "flex flex-col gap-4"}>
-      <TemplateBox
-        title="Image File Name Template"
-        description="Use tokens to generate image file name"
-        templateValue={filenameTemplate}
-        onTemplateChange={setFilenameTemplate}
-        joinWith="-"
-        enabled={isFilenameTemplateEnabled}
-        onEnabledChange={setIsFilenameTemplateEnabled}
-      />
+      {/* Cruise Control */}
+      <div className="flex items-center gap-3 rounded-xl border border-[#D1D1D1] bg-[#F2F6FC] px-4 py-3.5">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#155dfc]">
+          <Zap className="size-5 fill-white text-white" aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h6 className="text-sm font-semibold text-[#303030]">Cruise Control</h6>
+          <p className="text-xs text-[#616161]">
+            Auto-optimize new product and category images as they arrive
+          </p>
+        </div>
+        <ToggleSwitch
+          enabled={cruiseControlEnabled}
+          pending={cruiseControlPending}
+          disabled={loadState === "loading"}
+          onToggle={() => void handleCruiseControlToggle()}
+          label={
+            cruiseControlPending
+              ? "Updating Cruise Control"
+              : cruiseControlEnabled
+                ? "Disable Cruise Control"
+                : "Enable Cruise Control"
+          }
+        />
+      </div>
 
-      <TemplateBox
-        title="Alt Text Template"
-        description="Use tokens to generate ALT text"
-        templateValue={altTextTemplate}
-        onTemplateChange={setAltTextTemplate}
-        joinWith=" "
-        enabled={isAltTextTemplateEnabled}
-        onEnabledChange={setIsAltTextTemplateEnabled}
-      />
+      {/* Optimization Parameters */}
+      <div className="card">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <h2 className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+            Optimization Parameters
+          </h2>
+        </div>
 
-      <div className="card !mb-0">
-        <h2 className="mb-0 text-base font-bold text-[#303030]">
-          Optimization Settings
-        </h2>
-
-        <div className="mt-5 grid gap-6 md:grid-cols-2 md:items-start">
-          <div className="order-2 space-y-4 md:order-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-base font-semibold text-gray-900">
-                  Image Quality
-                </h3>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {COMPRESSION_RANGES[activePreset].label} band ·{" "}
-                  {COMPRESSION_RANGES[activePreset].min}–
-                  {COMPRESSION_RANGES[activePreset].max}%
-                </p>
-              </div>
-              <span className="text-2xl font-semibold tabular-nums text-blue-600">
-                {quality}%
+        <div className="space-y-6">
+          {/* Image Compression */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Image Compression
+              </h3>
+              <span className="rounded-full bg-[#155dfc]/10 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-[#155dfc] uppercase">
+                {getPresetBadgeLabel(quality)}
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="relative pt-1">
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-[#155dfc]"
+                  style={{ width: `${fillPercent}%` }}
+                />
+              </div>
+              <input
+                type="range"
+                min={QUALITY_MIN}
+                max={QUALITY_MAX}
+                value={quality}
+                onChange={(e) =>
+                  setQuality(clampQuality(Number(e.target.value)))
+                }
+                className="absolute inset-x-0 top-0 z-10 m-0 h-4 w-full cursor-pointer appearance-none bg-transparent [-moz-appearance:none] [-webkit-appearance:none] [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#155dfc] [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-track]:h-2 [&::-moz-range-track]:border-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#155dfc] [&::-moz-range-thumb]:shadow-md"
+                aria-valuemin={QUALITY_MIN}
+                aria-valuemax={QUALITY_MAX}
+                aria-valuenow={quality}
+                aria-label="Image compression quality"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 text-[11px] font-semibold tracking-wide uppercase">
               {COMPRESSION_PRESET_ORDER.map((id) => {
                 const range = COMPRESSION_RANGES[id];
                 const isActive = activePreset === id;
-
                 return (
                   <button
                     key={id}
                     type="button"
                     onClick={() => setQuality(range.default)}
-                    className={`rounded-lg border px-2 py-2.5 text-left transition-colors ${
-                      isActive
-                        ? "border-blue-500 bg-blue-50 ring-1 ring-blue-500"
-                        : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    <span
-                      className={`block text-sm font-semibold ${
-                        isActive ? "text-blue-700" : "text-gray-900"
+                    className={`${id === "medium"
+                        ? "text-center"
+                        : id === "high"
+                          ? "text-right"
+                          : "text-left"
+                      } ${isActive
+                        ? "rounded-md bg-blue-50 px-1.5 py-1 text-[#155dfc]"
+                        : "px-1.5 py-1 text-gray-400 hover:text-gray-600"
                       }`}
-                    >
-                      {range.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-gray-500">
-                      {range.min}–{range.max}%
-                    </span>
+                  >
+                    {range.label}
                   </button>
                 );
               })}
             </div>
+          </div>
 
-            <div className="relative h-10 w-full">
-              <div
-                className="pointer-events-none absolute inset-x-0 top-1/2 flex h-2 -translate-y-1/2 overflow-hidden rounded-full border border-gray-200/80"
-                aria-hidden
-              >
-                <div
-                  className="h-full bg-amber-200"
-                  style={{ width: `${zoneWidthPercent(50, 65)}%` }}
-                />
-                <div
-                  className="h-full bg-sky-200"
-                  style={{ width: `${zoneWidthPercent(65, 80)}%` }}
-                />
-                <div
-                  className="h-full bg-emerald-200"
-                  style={{ width: `${zoneWidthPercent(80, 100)}%` }}
-                />
-              </div>
-              <input
-                type="range"
-                min={50}
-                max={100}
-                value={quality}
-                onChange={(e) =>
-                  setQuality(clampQuality(Number(e.target.value)))
+          {/* Image Format Conversion */}
+          <div className="space-y-3 border-t border-gray-100 pt-5">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Image Format Conversion
+              </h3>
+              <ToggleSwitch
+                enabled={formatConversionEnabled}
+                onToggle={() =>
+                  setFormatConversionEnabled(!formatConversionEnabled)
                 }
-                className="absolute inset-0 z-10 m-0 h-full w-full cursor-pointer appearance-none bg-transparent [-moz-appearance:none] [-webkit-appearance:none] [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:-mt-1.5 [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-track]:h-2 [&::-moz-range-track]:border-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:shadow-md"
-                aria-valuemin={50}
-                aria-valuemax={100}
-                aria-valuenow={quality}
-                aria-label="Image quality percentage"
+                label={
+                  formatConversionEnabled
+                    ? "Disable format conversion"
+                    : "Enable format conversion"
+                }
               />
             </div>
 
-            <div className="relative h-4 text-xs font-medium text-gray-500">
-              {[50, 65, 80, 100].map((tick) => (
-                <span
-                  key={tick}
-                  className="absolute -translate-x-1/2 tabular-nums"
-                  style={{ left: `${sliderFillPercent(tick)}%` }}
-                >
-                  {tick}%
-                </span>
-              ))}
+            <p className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
+              Convert To
+            </p>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {formatRadioOptions.map((opt) => {
+                const selected = outputFormat === opt.id;
+                const disabled =
+                  !formatConversionEnabled && opt.id !== "original";
+
+                return (
+                  <label
+                    key={opt.id}
+                    className={`flex cursor-pointer gap-3 rounded-xl border bg-white p-3.5 transition-colors ${selected
+                        ? "border-[#155dfc] ring-1 ring-[#155dfc]"
+                        : "border-gray-200 hover:border-gray-300"
+                      } ${disabled ? "pointer-events-none opacity-50" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="outputFormat"
+                      value={opt.id}
+                      checked={selected}
+                      onChange={() => setOutputFormat(opt.id)}
+                      disabled={disabled}
+                      className="mt-1 accent-[#155dfc]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {opt.label}
+                        </span>
+                        {opt.badge ? (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${opt.badge.className}`}
+                          >
+                            {opt.badge.text}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-gray-500">
+                        {opt.description}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 
-          <div className="order-1 md:order-2">
-            <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <h3 className="text-base font-semibold text-gray-900">
-                  Image Format Conversion
-                </h3>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={formatConversionEnabled}
-                  onClick={() =>
-                    setFormatConversionEnabled(!formatConversionEnabled)
-                  }
-                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full px-1 transition-colors ${
-                    formatConversionEnabled ? "bg-blue-600" : "bg-gray-300"
-                  }`}
-                >
-                  <span className="sr-only">
-                    {formatConversionEnabled
-                      ? "Disable format conversion"
-                      : "Enable format conversion"}
-                  </span>
-                  <span
-                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      formatConversionEnabled
-                        ? "translate-x-5"
-                        : "translate-x-0"
-                    }`}
-                  />
-                </button>
-              </div>
+          {/* Filename Structure */}
+          <div className="border-t border-gray-100 pt-5">
+            <TemplateBox
+              title="Filename Structure"
+              templateValue={filenameTemplate}
+              onTemplateChange={setFilenameTemplate}
+              enabled={isFilenameTemplateEnabled}
+              onEnabledChange={setIsFilenameTemplateEnabled}
+              defaultTemplate="[name]"
+              previewMode="filename"
+              outputFormat={outputFormat}
+              variant="inline"
+            />
+          </div>
 
-              <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start">
-                <div className="min-w-0 flex-1 space-y-3">
-                  <p className="text-sm font-medium text-gray-700">Convert To</p>
-                  <div className="space-y-2">
-                    {formatRadioOptions.map((opt) => (
-                      <label
-                        key={opt.id}
-                        className={`flex cursor-pointer gap-3 rounded-lg border bg-white p-3 transition-colors ${
-                          outputFormat === opt.id
-                            ? "border-blue-500 ring-1 ring-blue-500"
-                            : "border-gray-200 hover:border-gray-300"
-                        } ${!formatConversionEnabled && opt.id !== "original" ? "pointer-events-none opacity-50" : ""}`}
-                      >
-                        <input
-                          type="radio"
-                          name="outputFormat"
-                          value={opt.id}
-                          checked={outputFormat === opt.id}
-                          onChange={() => setOutputFormat(opt.id)}
-                          disabled={
-                            !formatConversionEnabled && opt.id !== "original"
-                          }
-                          className="mt-0.5 accent-blue-600"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-gray-900">
-                              {opt.label}
-                            </span>
-                            {opt.badge && (
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${opt.badge.className}`}
-                              >
-                                {opt.badge.text}
-                              </span>
-                            )}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-gray-500">
-                            {opt.description}
-                          </span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {outputFormat === "webp" && formatConversionEnabled && (
-                  <aside className="shrink-0 rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm text-gray-700 lg:w-54">
-                    <p className="font-semibold text-sky-900">Why WebP?</p>
-                    <ul className="mt-2 space-y-1.5 text-xs leading-snug">
-                      <li>25–35% smaller size than JPEG/PNG</li>
-                      <li>Faster page load time</li>
-                      <li>Better for SEO</li>
-                      <li>Supported by all modern browsers</li>
-                    </ul>
-                    <a
-                      href="https://developers.google.com/speed/webp"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
-                    >
-                      Learn more
-                      <ExternalLink className="h-3 w-3" aria-hidden />
-                    </a>
-                  </aside>
-                )}
-              </div>
-            </div>
+          {/* Alt Text Template */}
+          <div className="border-t border-gray-100 pt-5">
+            <TemplateBox
+              title="Alt Text Template"
+              templateValue={altTextTemplate}
+              onTemplateChange={setAltTextTemplate}
+              enabled={isAltTextTemplateEnabled}
+              onEnabledChange={setIsAltTextTemplateEnabled}
+              defaultTemplate="[name]"
+              previewMode="alt"
+              variant="inline"
+            />
           </div>
         </div>
       </div>
 
-      <div className="card space-y-4 !mb-0">
-        <h2 className="mb-0 text-base font-bold text-[#303030]">
-          Cruise Control
-        </h2>
-
-        <CruiseControlSwitch
-          label="Auto-Optimize New Product Images"
-          enabled={autoOptimize}
-          pending={webhookTogglePending}
-          disabled={loadState === "loading"}
-          onToggle={handleAutoOptimizeToggle}
-          ariaLabels={{
-            on: "Enable auto-optimize for new product images",
-            off: "Disable auto-optimize for new product images",
-            busy: "Updating product auto-optimize setting",
-          }}
-        />
-
-        <CruiseControlSwitch
-          label="Auto-Optimize New Category Images"
-          enabled={autoOptimizeCategory}
-          pending={categoryWebhookTogglePending}
-          disabled={loadState === "loading"}
-          onToggle={handleCategoryWebhookToggle}
-          ariaLabels={{
-            on: "Enable auto-optimize for new category images",
-            off: "Disable auto-optimize for new category images",
-            busy: "Updating category auto-optimize setting",
-          }}
-        />
-      </div>
-
       {showActivityTable ? (
-        <div className="card !mb-0 !p-0 overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-0! shadow-sm">
           <table className="w-full text-xs md:text-[13px]">
             <thead>
               <tr className="border-b border-[#ebebeb] text-left text-[#616161]">
@@ -665,11 +603,10 @@ export function OptimizationSettingsForm({
                   <td className="text-[#303030]">{row[1]}</td>
                   <td>
                     <span
-                      className={`rounded px-2 py-1 text-xs font-medium ${
-                        row[2] === "success"
+                      className={`rounded px-2 py-1 text-xs font-medium ${row[2] === "success"
                           ? "bg-green-100 text-green-600"
                           : "bg-red-100 text-red-600"
-                      }`}
+                        }`}
                     >
                       {row[2]}
                     </span>

@@ -663,7 +663,7 @@ p {
   -webkit-user-drag: none;
 }
 
-.custom-input .form-control {
+.custom-input .form-control, .custom-input {
   font-size: 12px;
   font-weight: 400;
   padding: 6px 13px;
@@ -672,7 +672,7 @@ p {
   border-radius: 6px;
 }
 
-.custom-input .form-control:focus {
+.custom-input .form-control:focus, .custom-input:focus {
   outline: none;
   box-shadow: none;
 }

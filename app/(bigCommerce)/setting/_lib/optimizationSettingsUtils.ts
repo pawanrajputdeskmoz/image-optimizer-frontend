@@ -4,9 +4,9 @@ export const QUALITY_MIN = 50;
 export const QUALITY_MAX = 100;
 
 export const COMPRESSION_RANGES = {
-  low: { min: 50, max: 65, default: 57, label: "Low" },
-  medium: { min: 65, max: 80, default: 72, label: "Medium" },
-  high: { min: 80, max: 100, default: 90, label: "High" },
+  low: { min: 50, max: 65, default: 57, label: "Smallest" },
+  medium: { min: 65, max: 80, default: 72, label: "Balanced" },
+  high: { min: 80, max: 100, default: 90, label: "Lossless" },
 } as const;
 
 export type CompressionPresetId = keyof typeof COMPRESSION_RANGES;
@@ -24,6 +24,7 @@ export type FormatOption = {
   badge?: { text: string; className: string };
 };
 
+/** Formats shown in the modal 2×2 grid (matches design). */
 export const FORMAT_OPTIONS: FormatOption[] = [
   {
     id: "original",
@@ -44,13 +45,10 @@ export const FORMAT_OPTIONS: FormatOption[] = [
     id: "webp",
     label: "WebP (.webp)",
     description: "Smaller size with good quality",
-    badge: { text: "Recommended", className: "bg-emerald-100 text-emerald-700" },
-  },
-  {
-    id: "avif",
-    label: "AVIF (.avif)",
-    description: "Best compression (modern browsers)",
-    badge: { text: "Experimental", className: "bg-violet-100 text-violet-700" },
+    badge: {
+      text: "Recommended",
+      className: "bg-emerald-100 text-emerald-700",
+    },
   },
 ];
 
@@ -63,6 +61,7 @@ export type SettingsRow = {
   image_quality: number;
   output_format: string;
   auto_optimize_new_images: boolean;
+  auto_optimize_new_category_images: boolean;
 };
 
 export function clampQuality(value: number) {
@@ -75,12 +74,14 @@ export function getActivePreset(quality: number): CompressionPresetId {
   return "low";
 }
 
-export function sliderFillPercent(quality: number) {
-  return ((quality - QUALITY_MIN) / (QUALITY_MAX - QUALITY_MIN)) * 100;
+export function getPresetBadgeLabel(quality: number) {
+  const preset = getActivePreset(quality);
+  const label = COMPRESSION_RANGES[preset].label.toUpperCase();
+  return `${quality}% ${label === "LOSSLESS" ? "HIGH" : label}`;
 }
 
-export function zoneWidthPercent(min: number, max: number) {
-  return ((max - min) / (QUALITY_MAX - QUALITY_MIN)) * 100;
+export function sliderFillPercent(quality: number) {
+  return ((quality - QUALITY_MIN) / (QUALITY_MAX - QUALITY_MIN)) * 100;
 }
 
 export function parseSettings(data: unknown): SettingsRow | null {
@@ -117,6 +118,9 @@ export function parseSettings(data: unknown): SettingsRow | null {
     image_quality: clampQuality(q),
     output_format: d.output_format,
     auto_optimize_new_images: bool(d.auto_optimize_new_images),
+    auto_optimize_new_category_images: bool(
+      d.auto_optimize_new_category_images,
+    ),
   };
 }
 
@@ -130,5 +134,6 @@ export function applyDefaults(channel: number): SettingsRow {
     image_quality: COMPRESSION_RANGES.high.default,
     output_format: "webp",
     auto_optimize_new_images: true,
+    auto_optimize_new_category_images: true,
   };
 }
