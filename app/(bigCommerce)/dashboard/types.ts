@@ -226,6 +226,8 @@ export type BulkRestoreResponse = {
   success?: boolean;
   message?: string;
   data?: {
+    queued?: number;
+    skipped?: number;
     restored?: number;
     failed?: number;
   };

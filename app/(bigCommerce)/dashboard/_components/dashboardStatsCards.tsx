@@ -149,7 +149,7 @@ export default function DashboardStatsCards({
 
   useEffect(() => {
     // Initial load / refreshNonce bump: keep cards visible, spinner only on counts after first load.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     void load(stats ? "refresh" : "initial");
     // Intentionally only re-run on refreshNonce / load identity — not on stats.
     // eslint-disable-next-line react-hooks/exhaustive-deps
