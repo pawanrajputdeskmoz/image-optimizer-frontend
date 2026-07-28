@@ -4,51 +4,20 @@ import { toast } from "sonner";
 export const PAYPAL_CHECKOUT_PLAN_KEY = "paypal_checkout_plan_id";
 export const PAYPAL_SUBSCRIPTION_ID_KEY = "paypal_subscription_id";
 
-const SUBSCRIPTION_POLL_ATTEMPTS = 15;
-const SUBSCRIPTION_POLL_MS = 2000;
+const POLL_ATTEMPTS = 15;
+const POLL_MS = 2000;
 
 export interface SubscriptionRecord {
   plan_slug?: string;
   plan_name?: string;
-  amount?: number | string;
-  currency?: string;
   status?: string;
-  capture_id?: string;
-  payer_email?: string;
-  paid_at?: string;
-  [key: string]: unknown;
+  subscription_id?: string;
 }
-
-export interface CreatePaymentResponse {
-  success: boolean;
-  paypalSubscriptionId?: string;
-  approvalUrl?: string;
-  message?: string;
-  code?: string;
-}
-
-export interface CapturePaymentResponse {
-  success: boolean;
-  message?: string;
-  subscription?: SubscriptionRecord;
-  code?: string;
-}
-
-type PaypalLink = {
-  href?: string;
-  rel?: string;
-  method?: string;
-};
 
 export class PaymentServiceError extends Error {
   constructor(
     message: string,
-    public readonly kind:
-      | "network"
-      | "backend"
-      | "failed"
-      | "already_captured"
-      | "unknown" = "unknown",
+    public readonly kind: "network" | "backend" | "failed" | "unknown" = "unknown",
   ) {
     super(message);
     this.name = "PaymentServiceError";
@@ -72,50 +41,20 @@ function isHttpError(
   );
 }
 
-function classifyMessage(message: string): PaymentServiceError["kind"] {
-  const lower = message.toLowerCase();
-  if (lower.includes("already captured") || lower.includes("already been captured")) {
-    return "already_captured";
-  }
-  if (lower.includes("network") || lower.includes("failed to fetch")) {
-    return "network";
-  }
-  if (
-    lower.includes("payment failed") ||
-    lower.includes("not completed") ||
-    lower.includes("declined")
-  ) {
-    return "failed";
-  }
-  return "backend";
-}
-
 function toPaymentError(message: string): PaymentServiceError {
   const clean = message.replace(/^HTTP \d+:\s*/, "");
-  const kind = classifyMessage(clean);
-  const friendly =
-    kind === "already_captured"
-      ? "This payment was already completed."
-      : kind === "network"
-        ? "Network error. Please check your connection and try again."
-        : kind === "failed"
-          ? "Payment failed. Please try again or use a different method."
-          : clean || "Unable to process payment.";
-
-  return new PaymentServiceError(friendly, kind);
+  if (clean.toLowerCase().includes("network") || clean.toLowerCase().includes("failed to fetch")) {
+    return new PaymentServiceError("Network error. Please check your connection and try again.", "network");
+  }
+  return new PaymentServiceError(clean || "Unable to process payment.", "backend");
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function storedPlanSlug(): string | undefined {
-  if (typeof window === "undefined") return undefined;
-  return sessionStorage.getItem(PAYPAL_CHECKOUT_PLAN_KEY) ?? undefined;
-}
-
-/** Create a PayPal subscription; returns subscriptionId for Buttons popup (and approvalUrl for redirect fallback). */
-export async function createPayment(planId: string): Promise<CreatePaymentResponse> {
+/** Start a PayPal subscription checkout for a plan slug. */
+export async function createSubscription(planId: string) {
   const trimmed = planId.trim();
   if (!trimmed) {
     throw new PaymentServiceError("Plan is required.", "backend");
@@ -124,22 +63,10 @@ export async function createPayment(planId: string): Promise<CreatePaymentRespon
   const response = (await ApiCall(
     "payment/create-subscription",
     { planId: trimmed },
-    {
-      method: "POST",
-      rawBody: true,
-      suppressToast: true,
-    },
+    { method: "POST", rawBody: true, suppressToast: true },
   )) as {
-    success?: boolean;
     subscriptionId?: string;
     approvalUrl?: string;
-    data?: {
-      id?: string;
-      approvalUrl?: string;
-      links?: PaypalLink[];
-    };
-    id?: string;
-    links?: PaypalLink[];
     message?: string;
     error?: string;
   };
@@ -148,21 +75,9 @@ export async function createPayment(planId: string): Promise<CreatePaymentRespon
     throw toPaymentError(response.error);
   }
 
-  const subscriptionId =
-    response.subscriptionId || response.data?.id || response.id;
-
-  const approvalUrl =
-    response.approvalUrl ||
-    response.data?.approvalUrl ||
-    response.links?.find((link) => link.rel === "approve")?.href ||
-    response.data?.links?.find((link) => link.rel === "approve")?.href;
-
+  const subscriptionId = response.subscriptionId?.trim();
   if (!subscriptionId) {
-    throw toPaymentError(
-      response.message ||
-        response.error ||
-        "Subscription could not be started. Subscription ID is missing.",
-    );
+    throw toPaymentError(response.message || response.error || "Subscription ID is missing.");
   }
 
   if (typeof window !== "undefined") {
@@ -171,35 +86,29 @@ export async function createPayment(planId: string): Promise<CreatePaymentRespon
   }
 
   return {
-    success: true,
-    paypalSubscriptionId: subscriptionId,
-    approvalUrl,
+    subscriptionId,
+    approvalUrl: response.approvalUrl,
   };
 }
 
-/**
- * Wait for the store webhook to mark the PayPal subscription active.
- * Polls GET payment/subscription-status/:id until active or timeout.
- */
-export async function capturePayment(
-  paypalSubscriptionId: string,
-): Promise<CapturePaymentResponse> {
-  const trimmed = paypalSubscriptionId.trim();
-  if (!trimmed) {
+/** Poll backend until webhook marks the subscription active. */
+export async function waitForSubscriptionActive(subscriptionId: string): Promise<SubscriptionRecord> {
+  const id = subscriptionId.trim();
+  if (!id) {
     throw new PaymentServiceError("PayPal subscription ID is required.", "backend");
   }
 
-  const planSlug = storedPlanSlug();
-
-  for (let attempt = 0; attempt < SUBSCRIPTION_POLL_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
     const response = (await ApiCall(
-      `payment/subscription-status/${encodeURIComponent(trimmed)}`,
+      `payment/subscription-status/${encodeURIComponent(id)}`,
       {},
-      {
-        method: "GET",
-        suppressToast: true,
-      },
-    )) as { status?: string; message?: string; error?: string };
+      { method: "GET", suppressToast: true },
+    )) as {
+      status?: string;
+      plan_slug?: string;
+      plan_name?: string;
+      error?: string;
+    };
 
     if (isHttpError(response)) {
       throw toPaymentError(response.error);
@@ -207,55 +116,49 @@ export async function capturePayment(
 
     if (response.status === "active") {
       return {
-        success: true,
-        subscription: {
-          status: "active",
-          plan_slug: planSlug,
-          capture_id: trimmed,
-        },
+        status: "active",
+        plan_slug: response.plan_slug,
+        plan_name: response.plan_name,
+        subscription_id: id,
       };
     }
 
     if (response.status === "cancel") {
-      throw toPaymentError("Subscription was cancelled.");
+      throw new PaymentServiceError("Subscription was cancelled.", "failed");
     }
 
-    if (attempt < SUBSCRIPTION_POLL_ATTEMPTS - 1) {
-      await sleep(SUBSCRIPTION_POLL_MS);
+    if (attempt < POLL_ATTEMPTS - 1) {
+      await sleep(POLL_MS);
     }
   }
 
   return {
-    success: true,
-    subscription: {
-      status: "PENDING_ACTIVATION",
-      plan_slug: planSlug,
-      capture_id: trimmed,
-    },
+    status: "PENDING_ACTIVATION",
+    subscription_id: id,
+    plan_slug:
+      typeof window !== "undefined"
+        ? sessionStorage.getItem(PAYPAL_CHECKOUT_PLAN_KEY) ?? undefined
+        : undefined,
   };
 }
 
+/** @deprecated Use createSubscription */
+export const createPayment = createSubscription;
+
+/** @deprecated Use waitForSubscriptionActive */
+export const capturePayment = async (subscriptionId: string) => {
+  const subscription = await waitForSubscriptionActive(subscriptionId);
+  return { success: true, subscription };
+};
+
 export function getSubscriptionName(subscription?: SubscriptionRecord): string {
-  const name = subscription?.plan_name ?? subscription?.plan_slug;
-  return name != null ? String(name) : "—";
-}
-
-export function getSubscriptionAmount(subscription?: SubscriptionRecord): string {
-  const raw = subscription?.amount;
-  if (raw == null) return "—";
-  return String(raw);
-}
-
-export function getSubscriptionCurrency(subscription?: SubscriptionRecord): string {
-  return subscription?.currency ? String(subscription.currency) : "—";
+  return subscription?.plan_name ?? subscription?.plan_slug ?? "—";
 }
 
 export function getSubscriptionStatus(subscription?: SubscriptionRecord): string {
-  return subscription?.status ? String(subscription.status) : "—";
+  return subscription?.status ?? "—";
 }
 
-export function getSubscriptionTransactionId(
-  subscription?: SubscriptionRecord,
-): string {
-  return subscription?.capture_id ? String(subscription.capture_id) : "—";
+export function getSubscriptionTransactionId(subscription?: SubscriptionRecord): string {
+  return subscription?.subscription_id ?? "—";
 }

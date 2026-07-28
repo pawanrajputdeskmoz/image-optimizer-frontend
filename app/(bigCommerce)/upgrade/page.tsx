@@ -16,14 +16,14 @@ import {
   getPlanTheme,
 } from "./_lib/planThemes";
 import {
-  capturePayment,
-  createPayment,
+  createSubscription as startPayPalSubscription,
   notifyPaymentError,
+  waitForSubscriptionActive,
 } from "@/services/payment";
 import { PayPalButtons, PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { Check, ShieldCheck, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ?? "";
@@ -216,6 +216,33 @@ function PayPalCheckoutModal({
 }) {
   const [processing, setProcessing] = useState(false);
   const currency = plan.currency || "USD";
+  const confirmingRef = useRef(false);
+
+  const handleApproved = async (subscriptionId: string) => {
+    const id = subscriptionId.trim();
+    if (!id || confirmingRef.current) return;
+
+    confirmingRef.current = true;
+    setProcessing(true);
+
+    try {
+      const result = await waitForSubscriptionActive(id);
+      if (result.status === "PENDING_ACTIVATION") {
+        toast.warning(
+          "Payment received. Plan activation is processing — please refresh shortly.",
+        );
+        onClose();
+        return;
+      }
+
+      onSuccess(result.plan_name || plan.name);
+    } catch (err) {
+      confirmingRef.current = false;
+      notifyPaymentError(err);
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -258,35 +285,15 @@ function PayPalCheckoutModal({
               forceReRender={[plan.slug, currency]}
               createSubscription={async () => {
                 try {
-                  const res = await createPayment(plan.slug);
-                  const id = res.paypalSubscriptionId?.trim();
-                  if (!id) {
-                    throw new Error("Subscription ID is missing.");
-                  }
-                  return id;
+                  const { subscriptionId } = await startPayPalSubscription(plan.slug);
+                  return subscriptionId;
                 } catch (err) {
                   notifyPaymentError(err);
                   throw err;
                 }
               }}
               onApprove={async (data) => {
-                setProcessing(true);
-                try {
-                  const subscriptionId = data.subscriptionID ?? "";
-                  const result = await capturePayment(subscriptionId);
-                  if (result.subscription?.status === "PENDING_ACTIVATION") {
-                    toast.warning(
-                      "Payment received. Plan activation is processing — please refresh shortly.",
-                    );
-                    onClose();
-                  } else {
-                    onSuccess(result.subscription?.plan_name || plan.name);
-                  }
-                } catch (err) {
-                  notifyPaymentError(err);
-                } finally {
-                  setProcessing(false);
-                }
+                await handleApproved(data.subscriptionID ?? "");
               }}
               onCancel={() => {
                 toast.info("Payment cancelled. No charge was made.");
