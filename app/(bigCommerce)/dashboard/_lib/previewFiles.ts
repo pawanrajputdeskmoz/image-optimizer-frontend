@@ -21,7 +21,8 @@ export function storageFilePathToPublicUrl(
     return null;
   }
 
-  const base = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+  const rawBase = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+  const base = rawBase.replace(/\/api$/i, "");
   if (!base) {
     return null;
   }

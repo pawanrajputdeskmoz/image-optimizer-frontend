@@ -323,7 +323,7 @@ function mapApiImage(image: ApiImage, storeHash: string): ImageItem {
 
 export function mapApiProduct(product: ApiProduct, storeHash: string): Product {
   const images: ImageItem[] = Array.isArray(product.images)
-    ? product.images.map((image) => mapApiImage(image, storeHash)).reverse()
+    ? product.images.map((image) => mapApiImage(image, storeHash))
     : [];
 
   return {
