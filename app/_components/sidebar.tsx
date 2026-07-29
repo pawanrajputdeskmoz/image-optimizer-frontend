@@ -44,8 +44,8 @@ export default function Sidebar({
                   <Image
                     src={`${basePath}/images/logo-icon.svg`}
                     alt=""
-                    width={40}
-                    height={40}
+                    width={34}
+                    height={34}
                   />
                 </div>
                 <div className="menu-hover-logo align-item-center gap-3">

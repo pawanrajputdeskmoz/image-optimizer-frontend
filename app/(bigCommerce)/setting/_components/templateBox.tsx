@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import { Code2, ImageIcon } from "lucide-react";
+import { Code2, Eye, FileImage } from "lucide-react";
 
 import {
   TEMPLATE_VARIABLES,
@@ -17,6 +17,7 @@ import {
   applyTemplatePreview,
   getVariableLabel,
 } from "../_lib/templatePreview";
+import VcToggleSwitch from "./vcToggleSwitch";
 
 type TemplateBoxProps = {
   title: string;
@@ -32,7 +33,7 @@ type TemplateBoxProps = {
 };
 
 const CHIP_CLASS =
-  "inline-flex max-w-full items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 align-middle text-[12px] leading-tight text-gray-800 select-none";
+  "m-[1px] inline-flex max-w-full items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 align-middle text-[12px] leading-tight text-gray-800 select-none";
 
 function serializeEditor(root: HTMLElement): string {
   let result = "";
@@ -275,35 +276,6 @@ function getChipBeforeCursor(editor: HTMLElement): HTMLElement | null {
   return null;
 }
 
-function ToggleSwitch({
-  enabled,
-  onToggle,
-  label,
-}: {
-  enabled: boolean;
-  onToggle: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-label={label}
-      onClick={onToggle}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors ${
-        enabled ? "bg-[#155dfc]" : "bg-gray-300"
-      }`}
-    >
-      <span
-        className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
-          enabled ? "translate-x-5" : "translate-x-0"
-        }`}
-      />
-    </button>
-  );
-}
-
 export default function TemplateBox({
   title,
   description,
@@ -318,7 +290,7 @@ export default function TemplateBox({
 }: TemplateBoxProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [dropdownPlacement, setDropdownPlacement] = useState<"bottom" | "top">(
-    "bottom",
+    previewMode === "alt" ? "top" : "bottom",
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -489,6 +461,12 @@ export default function TemplateBox({
   useEffect(() => {
     if (!pickerOpen) return;
 
+    // Alt Text Template: always open upward so the list stays visible in the modal.
+    if (previewMode === "alt") {
+      setDropdownPlacement("top");
+      return;
+    }
+
     const updatePlacement = () => {
       const triggerRect = triggerRef.current?.getBoundingClientRect();
       if (!triggerRect) return;
@@ -511,7 +489,7 @@ export default function TemplateBox({
       window.removeEventListener("resize", updatePlacement);
       window.removeEventListener("scroll", updatePlacement, true);
     };
-  }, [pickerOpen]);
+  }, [pickerOpen, previewMode]);
 
   const showPlaceholder = enabled && !templateValue.trim();
 
@@ -564,7 +542,7 @@ export default function TemplateBox({
           }`}
         />
 
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-1.25 right-1.25">
           <button
             ref={triggerRef}
             type="button"
@@ -610,15 +588,44 @@ export default function TemplateBox({
       </div>
 
       {enabled ? (
-        <div className="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2">
-          <ImageIcon className="mt-0.5 size-4 shrink-0 text-gray-400" aria-hidden />
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium tracking-wide text-gray-400 uppercase">
-              Preview
-            </p>
-            <p className="mt-0.5 text-sm text-gray-700 wrap-break-word">
-              {previewText ? `"${previewText}"` : "Enter a template to preview"}
-            </p>
+        <div className="relative overflow-hidden rounded-xl border border-dashed border-[#D1D1D1] bg-[#F8F8F8] px-3.5 py-3">
+          <div className="relative mb-2.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex size-6 items-center justify-center rounded-md bg-white text-[#303030] shadow-sm ring-1 ring-[#E5E5E5]">
+                <Eye className="size-3.5" aria-hidden />
+              </span>
+              <span className="text-[11px] font-semibold tracking-wide text-[#303030] uppercase mt-0.5">
+                Preview
+              </span>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF8E8] px-2 py-0.5 text-[10px] font-semibold text-[#8A5A00] ring-1 ring-[#F0D9A0]">
+              Example only
+            </span>
+          </div>
+
+          <div className="relative rounded-lg bg-white px-3 py-2.5 shadow-sm ring-1 ring-[#E5E5E5]">
+            {previewText ? (
+              previewMode === "filename" ? (
+                <div className="flex min-w-0 items-start gap-2">
+                  <FileImage
+                    className="mt-0.5 size-4 shrink-0 text-[#303030]"
+                    aria-hidden
+                  />
+                  <p className="min-w-0 font-mono text-[12px] leading-5 text-[#303030] wrap-break-word">
+                    {previewText}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[12px] leading-5 text-[#303030] wrap-break-word">
+                  <span className="mr-1 text-[#8A8A8A]">Alt:</span>
+                  <span className="italic">&ldquo;{previewText}&rdquo;</span>
+                </p>
+              )
+            ) : (
+              <p className="text-[12px] text-[#8A8A8A]">
+                Add text or variables above to see an example result
+              </p>
+            )}
           </div>
         </div>
       ) : null}
@@ -631,11 +638,11 @@ export default function TemplateBox({
         type="button"
         disabled={!enabled || templateValue === defaultTemplate}
         onClick={handleRevert}
-        className="text-xs font-medium text-[#155dfc] hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline"
+        className="text-xs font-medium text-[#303030] hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline"
       >
         Revert to default
       </button>
-      <ToggleSwitch
+      <VcToggleSwitch
         enabled={enabled}
         onToggle={() => onEnabledChange(!enabled)}
         label={enabled ? `Disable ${title}` : `Enable ${title}`}
@@ -656,10 +663,10 @@ export default function TemplateBox({
   }
 
   return (
-    <div className="card mb-0! space-y-4">
+    <div className="card space-y-4 mb-0! shadow-none!">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="mb-0 text-base font-bold text-[#303030]">{title}</h3>
+          <h3 className="mb-0 text-sm font-semibold text-[#303030]">{title}</h3>
           {description ? (
             <p className="mt-1 mb-0 text-xs font-normal text-[#616161]">
               {description}

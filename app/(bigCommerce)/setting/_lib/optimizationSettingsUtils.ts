@@ -4,9 +4,9 @@ export const QUALITY_MIN = 50;
 export const QUALITY_MAX = 100;
 
 export const COMPRESSION_RANGES = {
-  low: { min: 50, max: 65, default: 57, label: "Smallest" },
-  medium: { min: 65, max: 80, default: 72, label: "Balanced" },
-  high: { min: 80, max: 100, default: 90, label: "Lossless" },
+  low: { min: 50, max: 65, default: 57, label: "Low" },
+  medium: { min: 65, max: 80, default: 72, label: "Medium" },
+  high: { min: 80, max: 100, default: 90, label: "High" },
 } as const;
 
 export type CompressionPresetId = keyof typeof COMPRESSION_RANGES;

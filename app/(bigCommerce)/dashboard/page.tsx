@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/accordion";
 
 import AltTextField from "./_components/altTextField";
+import RestoreConfirmModal from "./_components/restoreConfirmModal";
 import BrandImageListing from "./_components/brandImageListing";
 import CategoryImageListing from "./_components/categoryImageListing";
 import DashboardStatsCards from "./_components/dashboardStatsCards";
@@ -64,7 +65,6 @@ import type {
 const LIST_TYPE_OPTIONS: { id: ImageListType; label: string }[] = [
   { id: "product", label: "Products" },
   { id: "categories", label: "Categories" },
-  { id: "brand", label: "Brand" },
 ];
 
 type PreviewTarget = {
@@ -188,6 +188,10 @@ export default function DashboardPage() {
     Record<string, true>
   >({});
   const [saveAltBulkPending, setSaveAltBulkPending] = useState(false);
+  const [restoreConfirmOpen, setRestoreConfirmOpen] = useState(false);
+  const [restoreConfirmTarget, setRestoreConfirmTarget] = useState<
+    "global" | { product: (typeof products)[number] } | null
+  >(null);
   const silentListingRefreshRef = useRef(false);
   const wasActiveJobRef = useRef(false);
   const awaitingRestoreJobRef = useRef(false);
@@ -1565,7 +1569,10 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              onClick={() => void handleBulkRestoreAll()}
+              onClick={() => {
+                setRestoreConfirmTarget("global");
+                setRestoreConfirmOpen(true);
+              }}
               disabled={bulkRestoreAllPending}
               className="btn-default"
             >
@@ -1896,7 +1903,7 @@ export default function DashboardPage() {
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                       >
-                        {anyOptimized ? (
+                        {allOptimized ? (
                           <button
                             type="button"
                             disabled={resPending}
@@ -1969,19 +1976,19 @@ export default function DashboardPage() {
                                       }
                                     />
                                   </th>
-                                  <th className="w-[42%] px-3 py-2.5 font-semibold text-[#303030]">
+                                  <th className="w-[40%] px-3 py-2.5 font-semibold text-[#303030]">
                                     Image
                                   </th>
                                   <th className="px-3 py-2.5 font-semibold text-[#303030]">
                                     Alt Text
                                   </th>
-                                  <th className="px-3 py-2.5 font-semibold text-[#303030]">
+                                  <th className="w-30 whitespace-nowrap px-3 py-2.5 font-semibold text-[#303030]">
                                     Status
                                   </th>
-                                  <th className="px-3 py-2.5 font-semibold text-[#303030]">
+                                  <th className="w-27.5 whitespace-nowrap px-3 py-2.5 font-semibold text-[#303030]">
                                     Size saved
                                   </th>
-                                  <th className="px-3 py-2.5 font-semibold text-[#303030]">
+                                  <th className="w-30 px-3 py-2.5 font-semibold text-[#303030]">
                                     Action
                                   </th>
                                 </tr>
@@ -2072,7 +2079,7 @@ export default function DashboardPage() {
                                         </div>
                                       </td>
 
-                                      <td className="min-w-[220px] px-3 py-3 align-middle">
+                                      <td className="px-3 py-3 align-middle">
                                         <AltTextField
                                           value={getDisplayAlt(
                                             product.id,
@@ -2136,7 +2143,7 @@ export default function DashboardPage() {
                                                   image,
                                                 })
                                               }
-                                              className="inline-flex size-8 items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA]"
+                                              className="btn-default px-2!"
                                               aria-label="Preview"
                                               title="Preview"
                                             >
@@ -2277,6 +2284,27 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : null}
+
+      <RestoreConfirmModal
+        open={restoreConfirmOpen}
+        isPending={bulkRestoreAllPending}
+        onCancel={() => {
+          setRestoreConfirmOpen(false);
+          setRestoreConfirmTarget(null);
+        }}
+        onConfirm={() => {
+          if (restoreConfirmTarget === "global") {
+            void handleBulkRestoreAll();
+          } else if (
+            restoreConfirmTarget &&
+            "product" in restoreConfirmTarget
+          ) {
+            void restoreAllForProduct(restoreConfirmTarget.product);
+          }
+          setRestoreConfirmOpen(false);
+          setRestoreConfirmTarget(null);
+        }}
+      />
     </div>
   );
 }
