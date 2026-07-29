@@ -57,12 +57,16 @@ export function parseProductPreviewData(
   }
 
   const originalUrl =
-    storageFilePathToPublicUrl(preview.files?.original) ??
-    storageFilePathToPublicUrl(preview.old?.file_path) ??
+    preview.urls?.original?.trim() ||
+    preview.old?.url?.trim() ||
+    storageFilePathToPublicUrl(preview.files?.original) ||
+    storageFilePathToPublicUrl(preview.old?.file_path) ||
     (preview.image_url?.trim() || null);
 
   const optimizedUrl =
-    storageFilePathToPublicUrl(preview.files?.optimized) ??
+    preview.urls?.optimized?.trim() ||
+    preview.new?.url?.trim() ||
+    storageFilePathToPublicUrl(preview.files?.optimized) ||
     storageFilePathToPublicUrl(preview.new?.file_path);
 
   if (!originalUrl || !optimizedUrl) {

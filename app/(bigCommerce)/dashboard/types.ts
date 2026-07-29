@@ -130,6 +130,7 @@ export type PreviewImageMeta = {
   height?: number | null;
   format?: string | null;
   file_path?: string | null;
+  url?: string | null;
 };
 
 export type PreviewImageData = {
@@ -152,6 +153,10 @@ export type PreviewImageData = {
   optimization?: Record<string, unknown>;
   oldData?: PreviewOldData | null;
   files?: {
+    original?: string | null;
+    optimized?: string | null;
+  };
+  urls?: {
     original?: string | null;
     optimized?: string | null;
   };
