@@ -2,7 +2,7 @@
 
 import Spinner from "@/app/_components/ui/Spinner";
 import {
-  createPayment,
+  createSubscription,
   notifyPaymentError,
   PAYPAL_CHECKOUT_PLAN_KEY,
 } from "@/services/payment";
@@ -32,7 +32,7 @@ function PaymentCancelContent() {
 
     setRetrying(true);
     try {
-      const { approvalUrl } = await createPayment(planId);
+      const { approvalUrl } = await createSubscription(planId);
       if (approvalUrl) {
         window.location.href = approvalUrl;
         return;

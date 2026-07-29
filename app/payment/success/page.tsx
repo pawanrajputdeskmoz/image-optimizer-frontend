@@ -2,13 +2,13 @@
 
 import Spinner from "@/app/_components/ui/Spinner";
 import {
-  capturePayment,
   getSubscriptionName,
   getSubscriptionStatus,
   getSubscriptionTransactionId,
   notifyPaymentError,
   PAYPAL_CHECKOUT_PLAN_KEY,
   PAYPAL_SUBSCRIPTION_ID_KEY,
+  waitForSubscriptionActive,
   type SubscriptionRecord,
 } from "@/services/payment";
 import { CheckCircle2, XCircle } from "lucide-react";
@@ -59,8 +59,8 @@ function PaymentSuccessContent() {
 
     const confirmSubscription = async () => {
       try {
-        const result = await capturePayment(subscriptionId);
-        setSubscription(result.subscription ?? null);
+        const result = await waitForSubscriptionActive(subscriptionId);
+        setSubscription(result);
         setState("success");
         if (typeof window !== "undefined") {
           sessionStorage.removeItem(PAYPAL_CHECKOUT_PLAN_KEY);
