@@ -11,6 +11,8 @@ import {
 } from "@/app/_lib/channelStorage";
 import { isApiError, isApiFailure } from "../../dashboard/_lib/apiUtils";
 import TemplateBox from "./templateBox";
+import OptimizationModeCard from "./optimizationModeCard";
+import VcToggleSwitch from "./vcToggleSwitch";
 import {
   COMPRESSION_PRESET_ORDER,
   COMPRESSION_RANGES,
@@ -29,46 +31,6 @@ import {
 type UseOptimizationSettingsOptions = {
   enabled?: boolean;
 };
-
-function ToggleSwitch({
-  enabled,
-  pending,
-  disabled,
-  onToggle,
-  label,
-}: {
-  enabled: boolean;
-  pending?: boolean;
-  disabled?: boolean;
-  onToggle: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={enabled}
-      aria-busy={pending}
-      aria-label={label}
-      disabled={disabled || pending}
-      onClick={onToggle}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${enabled ? "bg-[#155dfc]" : "bg-gray-300"
-        }`}
-    >
-      {pending ? (
-        <span
-          className="absolute left-1/2 top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 animate-spin rounded-full border-2 border-white/40 border-t-white"
-          aria-hidden
-        />
-      ) : (
-        <span
-          className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5" : "translate-x-0"
-            }`}
-        />
-      )}
-    </button>
-  );
-}
 
 export function useOptimizationSettings({
   enabled = true,
@@ -384,17 +346,17 @@ export function OptimizationSettingsForm({
   return (
     <div className={className ?? "flex flex-col gap-4"}>
       {/* Cruise Control */}
-      <div className="flex items-center gap-3 rounded-xl border border-[#D1D1D1] bg-[#F2F6FC] px-4 py-3.5">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#155dfc]">
+      <div className="flex items-center gap-3 rounded-xl border border-[#D1D1D1] bg-[#F8F8F8] p-4">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#303030]">
           <Zap className="size-5 fill-white text-white" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
           <h6 className="text-sm font-semibold text-[#303030]">Cruise Control</h6>
-          <p className="text-xs text-[#616161]">
+          <p className="text-xs text-[#616161] font-normal mb-0">
             Auto-optimize new product and category images as they arrive
           </p>
         </div>
-        <ToggleSwitch
+        <VcToggleSwitch
           enabled={cruiseControlEnabled}
           pending={cruiseControlPending}
           disabled={loadState === "loading"}
@@ -409,8 +371,10 @@ export function OptimizationSettingsForm({
         />
       </div>
 
+      <OptimizationModeCard />
+
       {/* Optimization Parameters */}
-      <div className="card">
+      <div className="card mb-0! shadow-none!">
         <div className="mb-5 flex items-center justify-between gap-3">
           <h2 className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
             Optimization Parameters
@@ -424,15 +388,15 @@ export function OptimizationSettingsForm({
               <h3 className="text-sm font-semibold text-gray-900">
                 Image Compression
               </h3>
-              <span className="rounded-full bg-[#155dfc]/10 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-[#155dfc] uppercase">
+              <span className="rounded-full bg-[#5D5FEF]/10 px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-[#5D5FEF] uppercase">
                 {getPresetBadgeLabel(quality)}
               </span>
             </div>
 
             <div className="relative pt-1">
-              <div className="relative h-2 w-full overflow-hidden rounded-full bg-blue-100">
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-[#E5E5E5]">
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-[#155dfc]"
+                  className="absolute inset-y-0 left-0 rounded-full bg-[#303030]"
                   style={{ width: `${fillPercent}%` }}
                 />
               </div>
@@ -444,7 +408,7 @@ export function OptimizationSettingsForm({
                 onChange={(e) =>
                   setQuality(clampQuality(Number(e.target.value)))
                 }
-                className="absolute inset-x-0 top-0 z-10 m-0 h-4 w-full cursor-pointer appearance-none bg-transparent [-moz-appearance:none] [-webkit-appearance:none] [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#155dfc] [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-track]:h-2 [&::-moz-range-track]:border-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#155dfc] [&::-moz-range-thumb]:shadow-md"
+                className="absolute inset-x-0 top-0 z-10 m-0 h-4 w-full cursor-pointer appearance-none bg-transparent [-moz-appearance:none] [-webkit-appearance:none] [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:-mt-1 [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#303030] [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-track]:h-2 [&::-moz-range-track]:border-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-[#303030] [&::-moz-range-thumb]:shadow-md"
                 aria-valuemin={QUALITY_MIN}
                 aria-valuemax={QUALITY_MAX}
                 aria-valuenow={quality}
@@ -467,7 +431,7 @@ export function OptimizationSettingsForm({
                           ? "text-right"
                           : "text-left"
                       } ${isActive
-                        ? "rounded-md bg-blue-50 px-1.5 py-1 text-[#155dfc]"
+                        ? "rounded-md bg-[#F1F1F1] px-1.5 py-1 text-[#303030]"
                         : "px-1.5 py-1 text-gray-400 hover:text-gray-600"
                       }`}
                   >
@@ -484,7 +448,7 @@ export function OptimizationSettingsForm({
               <h3 className="text-sm font-semibold text-gray-900">
                 Image Format Conversion
               </h3>
-              <ToggleSwitch
+              <VcToggleSwitch
                 enabled={formatConversionEnabled}
                 onToggle={() =>
                   setFormatConversionEnabled(!formatConversionEnabled)
@@ -511,7 +475,7 @@ export function OptimizationSettingsForm({
                   <label
                     key={opt.id}
                     className={`flex cursor-pointer gap-3 rounded-xl border bg-white p-3.5 transition-colors ${selected
-                        ? "border-[#155dfc] ring-1 ring-[#155dfc]"
+                        ? "border-[#5D5FEF] bg-[#FDFDFD]"
                         : "border-gray-200 hover:border-gray-300"
                       } ${disabled ? "pointer-events-none opacity-50" : ""}`}
                   >
@@ -522,7 +486,7 @@ export function OptimizationSettingsForm({
                       checked={selected}
                       onChange={() => setOutputFormat(opt.id)}
                       disabled={disabled}
-                      className="mt-1 accent-[#155dfc]"
+                      className="mt-1 accent-[#303030]"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
@@ -546,37 +510,31 @@ export function OptimizationSettingsForm({
               })}
             </div>
           </div>
-
-          {/* Filename Structure */}
-          <div className="border-t border-gray-100 pt-5">
-            <TemplateBox
-              title="Filename Structure"
-              templateValue={filenameTemplate}
-              onTemplateChange={setFilenameTemplate}
-              enabled={isFilenameTemplateEnabled}
-              onEnabledChange={setIsFilenameTemplateEnabled}
-              defaultTemplate="[name]"
-              previewMode="filename"
-              outputFormat={outputFormat}
-              variant="inline"
-            />
-          </div>
-
-          {/* Alt Text Template */}
-          <div className="border-t border-gray-100 pt-5">
-            <TemplateBox
-              title="Alt Text Template"
-              templateValue={altTextTemplate}
-              onTemplateChange={setAltTextTemplate}
-              enabled={isAltTextTemplateEnabled}
-              onEnabledChange={setIsAltTextTemplateEnabled}
-              defaultTemplate="[name]"
-              previewMode="alt"
-              variant="inline"
-            />
-          </div>
         </div>
       </div>
+
+      <TemplateBox
+        title="File Name Template"
+        description="Build image filenames with text and product variables."
+        templateValue={filenameTemplate}
+        onTemplateChange={setFilenameTemplate}
+        enabled={isFilenameTemplateEnabled}
+        onEnabledChange={setIsFilenameTemplateEnabled}
+        defaultTemplate="[name]"
+        previewMode="filename"
+        outputFormat={outputFormat}
+      />
+
+      <TemplateBox
+        title="Alt Text Template"
+        description="Build alt text with text and product variables."
+        templateValue={altTextTemplate}
+        onTemplateChange={setAltTextTemplate}
+        enabled={isAltTextTemplateEnabled}
+        onEnabledChange={setIsAltTextTemplateEnabled}
+        defaultTemplate="[name]"
+        previewMode="alt"
+      />
 
       {showActivityTable ? (
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-0! shadow-sm">

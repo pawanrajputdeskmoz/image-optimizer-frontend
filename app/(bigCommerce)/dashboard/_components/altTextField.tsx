@@ -18,14 +18,14 @@ export default function AltTextField({
   onSave,
 }: AltTextFieldProps) {
   return (
-    <div className="custom-input relative">
+    <div className="custom-input relative w-full">
       <input
         type="text"
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder="alt text here"
-        className={`form-control ${
+        className={`form-control w-full ${
           showSave ? "pr-[4.75rem]" : ""
         }`}
       />

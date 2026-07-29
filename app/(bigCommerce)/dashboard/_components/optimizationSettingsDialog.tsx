@@ -32,12 +32,12 @@ export default function OptimizationSettingsDialog({
       <DialogTrigger className={triggerClassName}>
         Optimization Setting
       </DialogTrigger>
-      <DialogContent className="flex max-h-[90vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-gray-100 px-5 py-4">
+      <DialogContent className="flex max-h-[96vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogHeader className="border-b border-gray-100 px-5 py-4 gap-0">
           <DialogTitle className="text-base font-bold text-gray-900">
-            Optimization Settings
+            Image Optimizer Settings
           </DialogTitle>
-          <DialogDescription className="text-[13px] text-gray-500">
+          <DialogDescription className="text-xs text-[#616161] font-normal mb-0">
             Configure filename, alt text, and compression preferences.
           </DialogDescription>
         </DialogHeader>
