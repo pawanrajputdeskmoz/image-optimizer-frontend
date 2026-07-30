@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { FileText, Gauge, Rocket, type LucideIcon } from "lucide-react";
 
-type OptimizationModeId =
+export type OptimizationModeId =
   | "optimize_and_alt"
   | "optimize_only"
   | "alt_only";
@@ -96,10 +95,13 @@ function ModeOption({
   );
 }
 
-export default function OptimizationModeCard() {
-  const [selectedMode, setSelectedMode] =
-    useState<OptimizationModeId>("optimize_and_alt");
-
+export default function OptimizationModeCard({
+  selectedMode,
+  onSelectMode,
+}: {
+  selectedMode: OptimizationModeId;
+  onSelectMode: (mode: OptimizationModeId) => void;
+}) {
   const [primaryOption, ...secondaryOptions] = OPTIMIZATION_MODE_OPTIONS;
 
   return (
@@ -117,7 +119,7 @@ export default function OptimizationModeCard() {
         <ModeOption
           option={primaryOption}
           selected={selectedMode === primaryOption.id}
-          onSelect={() => setSelectedMode(primaryOption.id)}
+          onSelect={() => onSelectMode(primaryOption.id)}
         />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -126,7 +128,7 @@ export default function OptimizationModeCard() {
               key={option.id}
               option={option}
               selected={selectedMode === option.id}
-              onSelect={() => setSelectedMode(option.id)}
+              onSelect={() => onSelectMode(option.id)}
             />
           ))}
         </div>

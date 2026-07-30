@@ -26,6 +26,8 @@ type TemplateBoxProps = {
   onTemplateChange: (next: string) => void;
   enabled: boolean;
   onEnabledChange: (next: boolean) => void;
+  /** When true, ON/OFF toggle cannot be changed (e.g. alt-only mode). */
+  toggleDisabled?: boolean;
   defaultTemplate?: string;
   previewMode?: "alt" | "filename";
   outputFormat?: string;
@@ -283,6 +285,7 @@ export default function TemplateBox({
   onTemplateChange,
   enabled,
   onEnabledChange,
+  toggleDisabled = false,
   defaultTemplate = "[name]",
   previewMode = "alt",
   outputFormat = "webp",
@@ -644,6 +647,7 @@ export default function TemplateBox({
       </button>
       <VcToggleSwitch
         enabled={enabled}
+        disabled={toggleDisabled}
         onToggle={() => onEnabledChange(!enabled)}
         label={enabled ? `Disable ${title}` : `Enable ${title}`}
       />

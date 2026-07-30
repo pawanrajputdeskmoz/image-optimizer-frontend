@@ -50,6 +50,7 @@ export default function OptimizationSettingsDialog({
           <SettingsSaveActions
             settings={settings}
             buttonClassName="custom-btn min-w-32"
+            onSaveSuccess={() => setOpen(false)}
           />
         </DialogFooter>
       </DialogContent>

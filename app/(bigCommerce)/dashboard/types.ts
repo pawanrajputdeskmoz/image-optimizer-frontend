@@ -223,6 +223,9 @@ export type BulkImageOptimizationResponse = {
     job_uuid?: string;
     queued?: number;
     skipped?: number;
+    quota_limited?: boolean;
+    quota_remaining?: number | null;
+    not_queued_due_to_quota?: number;
   };
   error?: string;
 };

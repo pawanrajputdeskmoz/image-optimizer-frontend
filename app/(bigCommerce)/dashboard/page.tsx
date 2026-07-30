@@ -42,8 +42,10 @@ import {
   bulkRestoreAllImages,
   bulkRestoreImages,
   fetchProductList,
+  fetchStoreOptimizationSettings,
   optimizeSingleImage,
   restoreSingleImage,
+  saveProductSortDirection,
   updateImageAltText,
 } from "./_lib/imageOptimizerApi";
 import {
@@ -144,6 +146,7 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [productsPerPage, setProductsPerPage] = useState<number>(5);
   const [serverTotalPages, setServerTotalPages] = useState(1);
+  const [productSortDir, setProductSortDir] = useState<"asc" | "desc">("asc");
 
   const [selectedImages, setSelectedImages] = useState<
     Record<number, ImageItem>
@@ -546,9 +549,10 @@ export default function DashboardPage() {
       setBulkSelected({});
       setProductsRefreshNonce((n) => n + 1);
       toast.success(
-        skippedTotal > 0
-          ? `${queued} image(s) queued (${skippedTotal} already optimized, skipped)`
-          : `${queued} image(s) queued for optimization`
+        response.message ||
+          (skippedTotal > 0
+            ? `${queued} image(s) queued (${skippedTotal} already optimized, skipped)`
+            : `${queued} image(s) queued for optimization`)
       );
 
       if (queued <= 0) {
@@ -1195,6 +1199,25 @@ export default function DashboardPage() {
     };
   }, [searchInput, applyDebouncedSearch]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetchStoreOptimizationSettings();
+        if (cancelled || isApiError(response)) return;
+        const direction = response?.data?.product_sort_direction;
+        if (direction === "asc" || direction === "desc") {
+          setProductSortDir(direction);
+        }
+      } catch {
+        // keep default asc
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /*
   |--------------------------------------------------------------------------
   | FETCH PRODUCTS
@@ -1231,6 +1254,7 @@ export default function DashboardPage() {
           page: currentPage,
           limit: productsPerPage,
           search: debouncedSearch,
+          sort: productSortDir,
         });
 
         if (isCancelled || isApiError(response)) {
@@ -1371,7 +1395,7 @@ export default function DashboardPage() {
     return () => {
       isCancelled = true;
     };
-  }, [currentPage, debouncedSearch, listType, productsPerPage, listingRefreshKey]);
+  }, [currentPage, debouncedSearch, listType, productsPerPage, listingRefreshKey, productSortDir]);
 
   const handleProductsPerPageChange = useCallback((nextPerPage: number) => {
     setProductsPerPage(nextPerPage);
@@ -1711,9 +1735,23 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA]"
-              aria-label="Sort"
-              title="Sort"
+              onClick={() => {
+                setProductSortDir((prev) => {
+                  const next = prev === "asc" ? "desc" : "asc";
+                  void saveProductSortDirection(next).catch(() => {});
+                  return next;
+                });
+                setCurrentPage(1);
+              }}
+              className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-[#3F3F3F] bg-white text-[#303030] hover:bg-[#FAFAFA]"
+              aria-label={
+                productSortDir === "desc" ? "Sort Z to A" : "Sort A to Z"
+              }
+              title={
+                productSortDir === "desc"
+                  ? "Sorted: Z → A (click for A → Z)"
+                  : "Sorted: A → Z (click for Z → A)"
+              }
             >
               <ArrowUpDown className="size-4" />
             </button>

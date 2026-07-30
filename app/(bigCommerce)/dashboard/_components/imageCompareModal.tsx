@@ -10,6 +10,28 @@ import {
 } from "../_lib/previewMappers";
 import type { ImageItem } from "../types";
 
+function resolvePreviewFetchError(response: unknown): string {
+  if (
+    response &&
+    typeof response === "object" &&
+    "message" in response &&
+    typeof (response as { message?: unknown }).message === "string" &&
+    (response as { message: string }).message.trim()
+  ) {
+    return (response as { message: string }).message.trim();
+  }
+
+  if (isApiError(response)) {
+    const match = response.error.match(/^HTTP\s+\d+:\s*(.+)$/i);
+    const detail = (match?.[1] || response.error).trim();
+    if (detail) {
+      return detail;
+    }
+  }
+
+  return "Could not load preview images.";
+}
+
 type ImageCompareModalProps = {
   open: boolean;
   onClose: () => void;
@@ -36,7 +58,7 @@ export default function ImageCompareModal({
       const response = await fetchPreviewImageData(productId, image);
 
       if (isApiError(response) || response?.success === false) {
-        setFetchError("Could not load preview images.");
+        setFetchError(resolvePreviewFetchError(response));
         return;
       }
 

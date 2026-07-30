@@ -24,6 +24,30 @@ export type FormatOption = {
   badge?: { text: string; className: string };
 };
 
+export type OptimizationModeValue =
+  | "optimize_and_alt"
+  | "optimize_only"
+  | "alt_only";
+
+function normalizeOptimizationMode(value: unknown): OptimizationModeValue | null {
+  if (
+    value === "optimize_and_alt" ||
+    value === "optimize_only" ||
+    value === "alt_only"
+  ) {
+    return value;
+  }
+  return null;
+}
+
+function deriveOptimizationMode(
+  optimizeImageEnabled: boolean,
+  altTextEnabled: boolean,
+): OptimizationModeValue {
+  if (!optimizeImageEnabled) return "alt_only";
+  return altTextEnabled ? "optimize_and_alt" : "optimize_only";
+}
+
 /** Formats shown in the modal 2×2 grid (matches design). */
 export const FORMAT_OPTIONS: FormatOption[] = [
   {
@@ -54,6 +78,8 @@ export const FORMAT_OPTIONS: FormatOption[] = [
 
 export type SettingsRow = {
   channel_id: number;
+  optimization_mode: OptimizationModeValue;
+  optimize_image_enabled: boolean;
   is_filename_template_enabled: boolean;
   filename_template: string;
   is_alt_text_template_enabled: boolean;
@@ -109,11 +135,18 @@ export function parseSettings(data: unknown): SettingsRow | null {
   }
 
   const cid = Number(d.channel_id);
+  const optimizeImageEnabled = bool(d.optimize_image_enabled);
+  const altTextEnabled = bool(d.is_alt_text_template_enabled);
+  const optimizationMode =
+    normalizeOptimizationMode(d.optimization_mode) ??
+    deriveOptimizationMode(optimizeImageEnabled, altTextEnabled);
   return {
     channel_id: Number.isFinite(cid) ? cid : readChannelId(),
+    optimization_mode: optimizationMode,
+    optimize_image_enabled: optimizeImageEnabled,
     is_filename_template_enabled: bool(d.is_filename_template_enabled),
     filename_template: d.filename_template,
-    is_alt_text_template_enabled: bool(d.is_alt_text_template_enabled),
+    is_alt_text_template_enabled: altTextEnabled,
     alt_text_template: d.alt_text_template,
     image_quality: clampQuality(q),
     output_format: d.output_format,
@@ -127,6 +160,8 @@ export function parseSettings(data: unknown): SettingsRow | null {
 export function applyDefaults(channel: number): SettingsRow {
   return {
     channel_id: channel,
+    optimization_mode: "optimize_and_alt",
+    optimize_image_enabled: true,
     is_filename_template_enabled: true,
     filename_template: "[name]",
     is_alt_text_template_enabled: true,

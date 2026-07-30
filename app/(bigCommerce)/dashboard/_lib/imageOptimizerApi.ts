@@ -53,6 +53,7 @@ export async function fetchProductList(params: {
   page: number;
   limit: number;
   search?: string;
+  sort?: "asc" | "desc" | null;
   listType?: ImageListType;
 }) {
   const trimmedSearch = params.search?.trim();
@@ -64,6 +65,10 @@ export async function fetchProductList(params: {
 
   if (trimmedSearch) {
     body.search = trimmedSearch;
+  }
+
+  if (params.sort === "asc" || params.sort === "desc") {
+    body.sort = params.sort;
   }
 
   const query: Record<string, string> = {
@@ -142,6 +147,7 @@ export async function fetchPreviewImageData(
   return ApiCall(
     "image-optimizer/get-preview-img-data",
     buildPreviewPayload(productId, image),
+    { suppressToast: true },
   ) as Promise<PreviewImageApiResponse>;
 }
 
@@ -299,4 +305,22 @@ export async function fetchMerchantPlans() {
 
 export async function selectMerchantPlan(planSlug: string) {
   return ApiCall("settings/select-plan", { plan_slug: planSlug }) as Promise<SelectPlanResponse>;
+}
+
+export async function fetchStoreOptimizationSettings() {
+  return ApiCall("settings", {}, { method: "GET" }) as Promise<{
+    success?: boolean;
+    data?: { product_sort_direction?: "asc" | "desc" | null } | null;
+  }>;
+}
+
+/** Persist dashboard product name sort preference (fire-and-forget safe). */
+export async function saveProductSortDirection(
+  direction: "asc" | "desc",
+) {
+  return ApiCall(
+    "settings",
+    { product_sort_direction: direction },
+    { method: "PUT", rawBody: true },
+  );
 }
