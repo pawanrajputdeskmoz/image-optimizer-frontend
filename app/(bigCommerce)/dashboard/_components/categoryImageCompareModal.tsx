@@ -23,8 +23,14 @@ function parseCategoryPreviewPayload(preview: CategoryPreviewImageData | undefin
     return null;
   }
 
-  const originalUrl = preview.imageData?.original_url?.trim() ?? "";
-  const optimizedUrl = preview.imageData?.optimized_url?.trim() ?? "";
+  const originalUrl =
+    preview.urls?.original?.trim() ||
+    preview.imageData?.original_url?.trim() ||
+    "";
+  const optimizedUrl =
+    preview.urls?.optimized?.trim() ||
+    preview.imageData?.optimized_url?.trim() ||
+    "";
 
   if (!originalUrl || !optimizedUrl) {
     return null;
@@ -61,6 +67,8 @@ export default function CategoryImageCompareModal({
       return;
     }
 
+    const categoryId = category.id;
+
     setIsLoading(true);
     setFetchError(null);
     setOriginalUrl(null);
@@ -68,7 +76,7 @@ export default function CategoryImageCompareModal({
 
     try {
       const response = await fetchCategoryPreviewImageData({
-        categoryId: category.id,
+        categoryId,
       });
 
       if (isApiError(response)) {
@@ -99,17 +107,17 @@ export default function CategoryImageCompareModal({
     } finally {
       setIsLoading(false);
     }
-  }, [category]);
+  }, [category?.id]);
 
   useEffect(() => {
-    if (open && category) {
+    if (open && category?.id) {
       void loadPreview();
     } else {
       setOriginalUrl(null);
       setOptimizedUrl(null);
       setFetchError(null);
     }
-  }, [open, category, loadPreview]);
+  }, [open, category?.id, loadPreview]);
 
   if (!open || !category) {
     return null;

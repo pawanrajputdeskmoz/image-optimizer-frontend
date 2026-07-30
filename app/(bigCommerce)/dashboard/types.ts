@@ -521,6 +521,10 @@ export type CategoryPreviewImageData = {
     original?: string | null;
     optimized?: string | null;
   };
+  urls?: {
+    original?: string | null;
+    optimized?: string | null;
+  };
 };
 
 export type CategoryPreviewImageApiResponse = {
@@ -698,6 +702,10 @@ export type BrandPreviewImageData = {
     optimized_url?: string;
   };
   files?: {
+    original?: string | null;
+    optimized?: string | null;
+  };
+  urls?: {
     original?: string | null;
     optimized?: string | null;
   };

@@ -3,8 +3,13 @@
 import PreviewComparisonPanel, {
   type PreviewComparisonRow,
 } from "@/app/(bigCommerce)/dashboard/_components/previewComparisonPanel";
-import { useEffect, useState } from "react";
-import ReactCompareImage from "react-compare-image";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 type Props = {
   beforeSrc: string;
@@ -14,15 +19,6 @@ type Props = {
   beforeLabel?: string;
   afterLabel?: string;
   comparisonRows?: PreviewComparisonRow[];
-};
-
-const imageFitStyle = {
-  objectFit: "cover" as const,
-  width: "100%",
-  height: "100%",
-  display: "block",
-  pointerEvents: "none" as const,
-  userSelect: "none" as const,
 };
 
 function preloadImage(src: string): Promise<void> {
@@ -46,6 +42,9 @@ export default function ImageComparePopup({
   const [isOpen, setIsOpen] = useState(open);
   const [imagesReady, setImagesReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [position, setPosition] = useState(50);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     setIsOpen(open);
@@ -61,6 +60,7 @@ export default function ImageComparePopup({
     let cancelled = false;
     setImagesReady(false);
     setLoadError(false);
+    setPosition(50);
 
     Promise.all([preloadImage(beforeSrc), preloadImage(afterSrc)])
       .then(() => {
@@ -78,6 +78,39 @@ export default function ImageComparePopup({
       cancelled = true;
     };
   }, [isOpen, beforeSrc, afterSrc]);
+
+  const updatePositionFromClientX = useCallback((clientX: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const rect = track.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const next = ((clientX - rect.left) / rect.width) * 100;
+    setPosition(Math.min(100, Math.max(0, next)));
+  }, []);
+
+  const onPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      draggingRef.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      updatePositionFromClientX(event.clientX);
+    },
+    [updatePositionFromClientX],
+  );
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!draggingRef.current) return;
+      updatePositionFromClientX(event.clientX);
+    },
+    [updatePositionFromClientX],
+  );
+
+  const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    draggingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
 
   if (!isOpen) {
     return null;
@@ -116,22 +149,59 @@ export default function ImageComparePopup({
               <p className="text-xs text-gray-500">Loading…</p>
             </div>
           ) : (
-            <ReactCompareImage
-              leftImage={beforeSrc}
-              rightImage={afterSrc}
-              leftImageLabel={beforeLabel}
-              rightImageLabel={afterLabel}
-              leftImageCss={imageFitStyle}
-              rightImageCss={imageFitStyle}
-              aspectRatio="wider"
-              sliderLineColor="#ffffff"
-              sliderLineWidth={2}
-              handleSize={30}
-              hover={false}
-              skeleton={
-                <div className="h-full w-full animate-pulse bg-gray-200" />
-              }
-            />
+            <div
+              ref={trackRef}
+              className="relative h-full w-full cursor-ew-resize select-none"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              role="slider"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(position)}
+              aria-label="Image comparison slider"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft") {
+                  setPosition((prev) => Math.max(0, prev - 2));
+                } else if (event.key === "ArrowRight") {
+                  setPosition((prev) => Math.min(100, prev + 2));
+                }
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={afterSrc}
+                alt={afterLabel}
+                className="absolute inset-0 h-full w-full object-cover"
+                draggable={false}
+              />
+              <div
+                className="absolute inset-0"
+                style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={beforeSrc}
+                  alt={beforeLabel}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  draggable={false}
+                />
+              </div>
+              <div
+                className="absolute inset-y-0 z-10 w-0.5 bg-white"
+                style={{ left: `${position}%`, transform: "translateX(-50%)" }}
+              >
+                <div className="absolute top-1/2 left-1/2 size-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-black/40 shadow" />
+              </div>
+              <span className="absolute top-2 left-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                {beforeLabel}
+              </span>
+              <span className="absolute top-2 right-2 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                {afterLabel}
+              </span>
+            </div>
           )}
         </div>
 

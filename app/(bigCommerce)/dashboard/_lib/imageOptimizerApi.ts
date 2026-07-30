@@ -211,9 +211,13 @@ export async function bulkRestoreBrandImages(
 }
 
 export async function fetchBrandPreviewImageData(params: { brandId: number }) {
-  return ApiCall("brand-images/get-brand-preview-img-data", {
-    brand_id: params.brandId,
-  }) as Promise<BrandPreviewImageApiResponse>;
+  return ApiCall(
+    "brand-images/get-brand-preview-img-data",
+    {
+      brand_id: params.brandId,
+    },
+    { suppressToast: true },
+  ) as Promise<BrandPreviewImageApiResponse>;
 }
 
 export async function optimizeCategoryImage(
@@ -286,9 +290,13 @@ export async function restoreCategoryImage(
 export async function fetchCategoryPreviewImageData(params: {
   categoryId: number;
 }) {
-  return ApiCall("category-images/get-category-preview-img-data", {
-    category_id: params.categoryId,
-  }) as Promise<CategoryPreviewImageApiResponse>;
+  return ApiCall(
+    "category-images/get-category-preview-img-data",
+    {
+      category_id: params.categoryId,
+    },
+    { suppressToast: true },
+  ) as Promise<CategoryPreviewImageApiResponse>;
 }
 
 export async function fetchDashboardStats() {

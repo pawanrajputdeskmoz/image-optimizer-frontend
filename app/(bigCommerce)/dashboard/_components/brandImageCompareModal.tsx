@@ -25,10 +25,12 @@ function parseBrandPreviewPayload(preview: BrandPreviewImageData | undefined): {
   }
 
   const originalUrl =
+    preview.urls?.original?.trim() ||
     preview.imageData?.original_url?.trim() ||
     storageFilePathToPublicUrl(preview.files?.original) ||
     "";
   const optimizedUrl =
+    preview.urls?.optimized?.trim() ||
     preview.imageData?.optimized_url?.trim() ||
     storageFilePathToPublicUrl(preview.files?.optimized) ||
     "";
@@ -68,6 +70,8 @@ export default function BrandImageCompareModal({
       return;
     }
 
+    const brandId = brand.id;
+
     setIsLoading(true);
     setFetchError(null);
     setOriginalUrl(null);
@@ -75,7 +79,7 @@ export default function BrandImageCompareModal({
 
     try {
       const response = await fetchBrandPreviewImageData({
-        brandId: brand.id,
+        brandId,
       });
 
       if (isApiError(response)) {
@@ -104,17 +108,17 @@ export default function BrandImageCompareModal({
     } finally {
       setIsLoading(false);
     }
-  }, [brand]);
+  }, [brand?.id]);
 
   useEffect(() => {
-    if (open && brand) {
+    if (open && brand?.id) {
       void loadPreview();
     } else {
       setOriginalUrl(null);
       setOptimizedUrl(null);
       setFetchError(null);
     }
-  }, [open, brand, loadPreview]);
+  }, [open, brand?.id, loadPreview]);
 
   if (!open || !brand) {
     return null;
