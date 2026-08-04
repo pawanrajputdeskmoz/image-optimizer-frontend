@@ -50,6 +50,8 @@ export type ApiImage = {
   optimization_status?: string;
   /** Attached in batch by get-all-products */
   size?: ApiImageSize;
+  saved_bytes?: number | null;
+  saved_percentage?: number | null;
 };
 
 export type ApiProduct = {

@@ -54,7 +54,7 @@ function channelDisplayName(channel?: ApiChannel | null) {
 
 function ChannelSelect() {
   const pathname = usePathname();
-  const hasFetchedRef = useRef(false);
+  const loadIdRef = useRef(0);
   const [channels, setChannels] = useState<ApiChannel[]>([]);
   const [channelId, setChannelId] = useState<number>(() => readChannelId());
   const [isLoading, setIsLoading] = useState(true);
@@ -78,12 +78,7 @@ function ChannelSelect() {
       return;
     }
 
-    if (hasFetchedRef.current) {
-      return;
-    }
-    hasFetchedRef.current = true;
-
-    let isActive = true;
+    const loadId = ++loadIdRef.current;
 
     void (async () => {
       setIsLoading(true);
@@ -91,7 +86,7 @@ function ChannelSelect() {
 
       try {
         const { channels: list, defaultChannelId } = await fetchChannelsOnce();
-        if (!isActive) {
+        if (loadId !== loadIdRef.current) {
           return;
         }
 
@@ -106,7 +101,7 @@ function ChannelSelect() {
           setChannelId(initial.channel_id);
         }
       } catch (err) {
-        if (!isActive) {
+        if (loadId !== loadIdRef.current) {
           return;
         }
 
@@ -120,16 +115,12 @@ function ChannelSelect() {
           setChannelId(stored.channel_id);
         }
       } finally {
-        if (isActive) {
+        if (loadId === loadIdRef.current) {
           setIsLoading(false);
         }
       }
     })();
-
-    return () => {
-      isActive = false;
-    };
-  }, [pathname]);
+    }, [pathname]);
 
   const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const nextId = Number(event.target.value);

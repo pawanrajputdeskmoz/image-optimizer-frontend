@@ -458,10 +458,12 @@ export default function CategoryImageListing({
   }, [categories, selectedIds, currentPage, perPage, loadCategories]);
 
   const goToPage = useCallback((page: number) => {
+    setSelectedIds(new Set());
     setCurrentPage(Math.max(1, page));
   }, []);
 
   const handlePerPageChange = useCallback((nextPerPage: number) => {
+    setSelectedIds(new Set());
     setPerPage(nextPerPage);
     setCurrentPage(1);
   }, []);

@@ -4,16 +4,11 @@ import { useSelectedLayoutSegment } from "next/navigation";
 import Image from "next/image";
 import { basePath } from "@/app/lib/basePath";
 import Link from "next/link";
-import { useState, type ComponentType } from "react";
+import { type ComponentType } from "react";
 import {
   LayoutDashboard,
-  Image as ImageIcon,
   Settings,
-  Link2,
-  TriangleAlert,
-  FilePenLine,
   BadgeDollarSign,
-  ShieldCheck,
   HelpCircle,
 } from "lucide-react";
 
@@ -31,7 +26,6 @@ export default function Sidebar({
   handleOnChange?: () => void;
 }) {
   const segment = useSelectedLayoutSegment() || "dashboard";
-  const [urlDropdownOpen, setUrlDropdownOpen] = useState(false);
 
   return (
     <>
@@ -83,20 +77,6 @@ export default function Sidebar({
             <li>
               <Link
                 prefetch={false}
-                href="/image-optimizer"
-                className={segment == "image-optimizer" ? "active" : ""}
-              >
-                <div className="nav-icon">
-                  <SidebarIcon icon={ImageIcon} />
-                </div>
-                <span className="nav-text">Image Optimizer</span>
-              </Link>
-            </li>
-
-
-            <li>
-              <Link
-                prefetch={false}
                 href="/setting"
                 className={segment == "setting" ? "active" : ""}
               >
@@ -106,51 +86,6 @@ export default function Sidebar({
                 <span className="nav-text">Setting</span>
               </Link>
             </li>
-
-
-            <li>
-              <div className="relative">
-                <button
-                  type="button"
-                  className="w-full text-left"
-                  onClick={() => setUrlDropdownOpen((v) => !v)}
-                  aria-expanded={urlDropdownOpen}
-                >
-                  <div className="nav-icon">
-                    <SidebarIcon icon={Link2} />
-                  </div>
-                  <span className="nav-text">404 & URL</span>
-                </button>
-
-                {urlDropdownOpen ? (
-                  <div className="mt-2 flex flex-col rounded-lg border border-zinc-200 bg-white p-2 shadow-sm">
-                    <Link
-                      href="/404-fixer"
-                      className={segment == "404-fixer" ? "active" : ""}
-                      onClick={() => setUrlDropdownOpen(false)}
-                    >
-                      <div className="nav-icon">
-                        <SidebarIcon icon={TriangleAlert} />
-                      </div>
-                      <span className="nav-text">404 Fixer</span>
-                    </Link>
-
-                    <Link
-                      href="/url-editor"
-                      className={segment == "url-editor" ? "active" : ""}
-                      onClick={() => setUrlDropdownOpen(false)}
-                    >
-                      <div className="nav-icon">
-                        <SidebarIcon icon={FilePenLine} />
-                      </div>
-                      <span className="nav-text">URL Editor</span>
-                    </Link>
-                  </div>
-                ) : null}
-              </div>
-            </li>
-
-
 
             <li className="nav-separator"></li>
 
@@ -164,19 +99,6 @@ export default function Sidebar({
                   <SidebarIcon icon={BadgeDollarSign} />
                 </div>
                 <span className="nav-text">Upgrade</span>
-              </Link>
-            </li>
-
-            <li>
-              <Link
-                prefetch={false}
-                href="/upgrade?tab=seoServices"
-                className={segment === "upgrade" ? "active" : ""}
-              >
-                <div className="nav-icon">
-                  <SidebarIcon icon={ShieldCheck} />
-                </div>
-                <span className="nav-text">SEO Services</span>
               </Link>
             </li>
 

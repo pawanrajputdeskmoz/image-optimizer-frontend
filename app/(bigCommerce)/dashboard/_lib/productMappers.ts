@@ -301,6 +301,11 @@ function mapApiImage(image: ApiImage, storeHash: string): ImageItem {
   const optimizationStatus = image.optimization_status;
   const isOpt = optimizationStatus === "optimized";
   const imageFile = image.image_file?.trim() || "";
+  const savedPercent =
+    typeof image.saved_percentage === "number" &&
+    Number.isFinite(image.saved_percentage)
+      ? image.saved_percentage
+      : null;
 
   return {
     id: image.id,
@@ -318,6 +323,7 @@ function mapApiImage(image: ApiImage, storeHash: string): ImageItem {
     sortOrder: typeof image.sort_order === "number" ? image.sort_order : 0,
     optimizationStatus,
     optimized: isOpt,
+    savedPercent: isOpt ? savedPercent : null,
   };
 }
 
@@ -325,6 +331,8 @@ export function mapApiProduct(product: ApiProduct, storeHash: string): Product {
   const images: ImageItem[] = Array.isArray(product.images)
     ? product.images.map((image) => mapApiImage(image, storeHash))
     : [];
+
+  images.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   return {
     id: product.id,

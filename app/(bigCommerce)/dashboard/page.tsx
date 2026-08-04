@@ -23,6 +23,7 @@ import {
 
 import AltTextField from "./_components/altTextField";
 import RestoreConfirmModal from "./_components/restoreConfirmModal";
+import OptimizeConfirmModal from "./_components/optimizeConfirmModal";
 import BrandImageListing from "./_components/brandImageListing";
 import CategoryImageListing from "./_components/categoryImageListing";
 import DashboardStatsCards from "./_components/dashboardStatsCards";
@@ -75,6 +76,9 @@ type PreviewTarget = {
 };
 
 const PRODUCT_PER_PAGE_OPTIONS = [5, 10] as const;
+/** Collapsed product row + gap — keeps listing height stable while loading. */
+const PRODUCT_LIST_ROW_PX = 68;
+const PRODUCT_LIST_GAP_PX = 8;
 
 function altTextKey(productId: number, imageId: number) {
   return `${productId}-${imageId}`;
@@ -195,7 +199,9 @@ export default function DashboardPage() {
   const [restoreConfirmTarget, setRestoreConfirmTarget] = useState<
     "global" | { product: (typeof products)[number] } | null
   >(null);
+  const [optimizeConfirmOpen, setOptimizeConfirmOpen] = useState(false);
   const silentListingRefreshRef = useRef(false);
+  const productsLoadIdRef = useRef(0);
   const wasActiveJobRef = useRef(false);
   const awaitingRestoreJobRef = useRef(false);
   const wasActiveRestoreRef = useRef(false);
@@ -1028,6 +1034,13 @@ export default function DashboardPage() {
       totalPages
     );
 
+    if (nextPage === currentPage) {
+      return;
+    }
+
+    setBulkSelected({});
+    setSelectedImages({});
+    setContextualHeaderSelectAllChecked(false);
     setCurrentPage(nextPage);
   };
 
@@ -1230,6 +1243,7 @@ export default function DashboardPage() {
     }
 
     let isCancelled = false;
+    const loadId = ++productsLoadIdRef.current;
     const silent = silentListingRefreshRef.current;
     silentListingRefreshRef.current = false;
 
@@ -1384,7 +1398,9 @@ export default function DashboardPage() {
           setProductsError("Something went wrong while loading products.");
         }
       } finally {
-        if (!isCancelled && !silent) {
+        // Clear loading for the latest request only. Silent poll must also clear
+        // so a cancelled page-change load cannot leave the skeleton stuck.
+        if (loadId === productsLoadIdRef.current) {
           setIsLoadingProducts(false);
         }
       }
@@ -1400,6 +1416,9 @@ export default function DashboardPage() {
   const handleProductsPerPageChange = useCallback((nextPerPage: number) => {
     setProductsPerPage(nextPerPage);
     setCurrentPage(1);
+    setBulkSelected({});
+    setSelectedImages({});
+    setContextualHeaderSelectAllChecked(false);
   }, []);
 
   const handleListTypeChange = useCallback((nextType: ImageListType) => {
@@ -1580,7 +1599,7 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              onClick={() => void bulkOptimizeAll()}
+              onClick={() => setOptimizeConfirmOpen(true)}
               disabled={bulkOptimizeAllPending}
               className="btn-default disabled:bg-[#F0F0F0] disabled:text-[#8A8A8A] disabled:shadow-none"
             >
@@ -1802,35 +1821,58 @@ export default function DashboardPage() {
 
         {/* PRODUCTS */}
 
-        {listType === "product" && isLoadingProducts ? (
-          <div className="rounded-xl border bg-white">
-            <div className="flex items-center justify-center gap-3 px-4 py-10 text-sm text-[#616161]">
-              <span className="inline-block size-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-              Loading products...
-            </div>
-          </div>
-        ) : null}
+        {listType === "product" ? (
+          <div
+            className="relative"
+            style={{
+              minHeight:
+                productsPerPage * PRODUCT_LIST_ROW_PX +
+                Math.max(0, productsPerPage - 1) * PRODUCT_LIST_GAP_PX,
+            }}
+          >
+            {isLoadingProducts ? (
+              <div className="space-y-2" aria-busy="true" aria-label="Loading products">
+                {Array.from({ length: productsPerPage }, (_, index) => (
+                  <div
+                    key={`product-skeleton-${index}`}
+                    className="card mb-0! flex items-center gap-3 bg-[#F8FAFC]! p-3! shadow-none!"
+                  >
+                    <div className="size-4 shrink-0 animate-pulse rounded bg-gray-200" />
+                    <div className="size-10 shrink-0 animate-pulse rounded bg-gray-200" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="h-3.5 w-2/5 max-w-[220px] animate-pulse rounded bg-gray-200" />
+                      <div className="h-3 w-1/4 max-w-[120px] animate-pulse rounded bg-gray-100" />
+                    </div>
+                    <div className="ml-auto hidden items-center gap-2 sm:flex">
+                      <div className="h-7 w-16 animate-pulse rounded-lg bg-gray-200" />
+                      <div className="h-7 w-16 animate-pulse rounded-lg bg-gray-200" />
+                      <div className="size-7 animate-pulse rounded-lg bg-gray-200" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
-        {listType === "product" && productsError ? (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {productsError}
-          </div>
-        ) : null}
+            {!isLoadingProducts && productsError ? (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {productsError}
+              </div>
+            ) : null}
 
-        {listType === "product" && !isLoadingProducts ? (
-          <div className="space-y-2">
-            <Accordion
-              value={openProductAccordion}
-              onValueChange={(nextValue) => {
-                const last =
-                  Array.isArray(nextValue) && nextValue.length
-                    ? nextValue[nextValue.length - 1]
-                    : undefined;
+            {!isLoadingProducts ? (
+              <div className="space-y-2">
+                <Accordion
+                  value={openProductAccordion}
+                  onValueChange={(nextValue) => {
+                    const last =
+                      Array.isArray(nextValue) && nextValue.length
+                        ? nextValue[nextValue.length - 1]
+                        : undefined;
 
-                setOpenProductAccordion(last ? [last] : []);
-              }}
-              className="gap-2"
-            >
+                    setOpenProductAccordion(last ? [last] : []);
+                  }}
+                  className="gap-2"
+                >
               {products.map((product) => {
                 const selectedImage = selectedImages[product.id];
                 const listingImage =
@@ -2251,6 +2293,8 @@ export default function DashboardPage() {
                 No products found.
               </div>
             ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -2341,6 +2385,16 @@ export default function DashboardPage() {
           }
           setRestoreConfirmOpen(false);
           setRestoreConfirmTarget(null);
+        }}
+      />
+
+      <OptimizeConfirmModal
+        open={optimizeConfirmOpen}
+        isPending={bulkOptimizeAllPending}
+        onCancel={() => setOptimizeConfirmOpen(false)}
+        onConfirm={() => {
+          setOptimizeConfirmOpen(false);
+          void bulkOptimizeAll();
         }}
       />
     </div>

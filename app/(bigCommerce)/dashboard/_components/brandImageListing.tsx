@@ -388,7 +388,13 @@ export default function BrandImageListing({
     }
   }, [brands, selectedIds, currentPage, perPage, loadBrands]);
 
+  const goToPage = useCallback((page: number) => {
+    setSelectedIds(new Set());
+    setCurrentPage(Math.max(1, page));
+  }, []);
+
   const handlePerPageChange = useCallback((nextPerPage: number) => {
+    setSelectedIds(new Set());
     setPerPage(nextPerPage);
     setCurrentPage(1);
   }, []);
@@ -600,7 +606,7 @@ export default function BrandImageListing({
       <ListingPagination
         currentPage={safeCurrentPage}
         totalPages={totalPages}
-        onPageChange={setCurrentPage}
+        onPageChange={goToPage}
         disabled={isLoading}
         perPage={perPage}
         perPageOptions={[...BRAND_PER_PAGE_OPTIONS]}
