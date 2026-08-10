@@ -130,7 +130,11 @@ export function buildProductImageUrl(
 }
 
 export function formatBytesToKb(bytes: number): string {
-  return `${(bytes / 1024).toFixed(1)} KB`;
+  const kb = bytes / 1024;
+  if (kb >= 1024) {
+    return `${(kb / 1024).toFixed(1)} MB`;
+  }
+  return `${kb.toFixed(1)} KB`;
 }
 
 export function formatImageSizeKb(size?: ApiImageSize): string {
@@ -219,6 +223,31 @@ export function applyOptimizationResult(
       typeof data.optimizedImage?.compression?.savedPercent === "number"
         ? data.optimizedImage.compression.savedPercent
         : image.savedPercent ?? null,
+  };
+}
+
+/** Filename / alt-text only — keep compression status unchanged. */
+export function applyMetadataOnlyResult(
+  image: ImageItem,
+  imageId: number,
+  data: NonNullable<SingleImageOptimizationResponse["data"]>,
+): ImageItem {
+  if (image.id !== imageId) {
+    return image;
+  }
+
+  const { imageFile, fileName } = resolveOptimizedImageFile(image, data);
+  const newAltText = data.imageMeta?.newAltText;
+  const alt =
+    newAltText != null && String(newAltText).trim() !== ""
+      ? String(newAltText).trim()
+      : image.alt;
+
+  return {
+    ...image,
+    imageFile,
+    fileName,
+    alt,
   };
 }
 

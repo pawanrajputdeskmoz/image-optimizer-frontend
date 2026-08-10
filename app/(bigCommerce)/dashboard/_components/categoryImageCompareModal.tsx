@@ -4,13 +4,14 @@ import ImageComparePopup from "@/app/_components/imagePreview";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { isApiError } from "../_lib/apiUtils";
 import { fetchCategoryPreviewImageData } from "../_lib/imageOptimizerApi";
+import { formatBytesToKb } from "../_lib/productMappers";
 import type { Category, CategoryPreviewImageData } from "../types";
 
 function formatBytesLabel(bytes?: number | null): string {
   if (typeof bytes !== "number" || !Number.isFinite(bytes)) {
     return "—";
   }
-  return `${(bytes / 1024).toFixed(1)} KB`;
+  return formatBytesToKb(bytes);
 }
 
 function parseCategoryPreviewPayload(preview: CategoryPreviewImageData | undefined): {

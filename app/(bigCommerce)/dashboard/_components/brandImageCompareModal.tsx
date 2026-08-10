@@ -4,6 +4,7 @@ import ImageComparePopup from "@/app/_components/imagePreview";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { isApiError } from "../_lib/apiUtils";
 import { fetchBrandPreviewImageData } from "../_lib/imageOptimizerApi";
+import { formatBytesToKb } from "../_lib/productMappers";
 import { storageFilePathToPublicUrl } from "../_lib/previewFiles";
 import type { Brand, BrandPreviewImageData } from "../types";
 
@@ -11,7 +12,7 @@ function formatBytesLabel(bytes?: number | null): string {
   if (typeof bytes !== "number" || !Number.isFinite(bytes)) {
     return "—";
   }
-  return `${(bytes / 1024).toFixed(1)} KB`;
+  return formatBytesToKb(bytes);
 }
 
 function parseBrandPreviewPayload(preview: BrandPreviewImageData | undefined): {

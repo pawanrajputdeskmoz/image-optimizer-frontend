@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { isApiError, isApiFailure } from "../_lib/apiUtils";
 import {
@@ -24,8 +24,18 @@ import ContextualImageRow from "./contextualImageRow";
 
 const CATEGORY_PER_PAGE_OPTIONS = [5, 10, 50] as const;
 
+export type CategoryBulkActionsState = {
+  selectedCount: number;
+  selectedOptimizeCount: number;
+  selectedRestoreCount: number;
+  isBulkOptimizing: boolean;
+  isBulkRestoring: boolean;
+};
+
 type CategoryImageListingProps = {
   refreshNonce?: number;
+  /** Silent background refresh (active job polling) — no listing skeleton. */
+  pollNonce?: number;
   headerSelectAllChecked?: boolean;
   headerSelectAllSignal?: number;
   onHeaderSelectAllStateChange?: (state: {
@@ -33,6 +43,13 @@ type CategoryImageListingProps = {
     visible: boolean;
     disabled: boolean;
   }) => void;
+  onBulkActionsStateChange?: (state: CategoryBulkActionsState) => void;
+  bulkActionsRef?: React.MutableRefObject<{
+    optimize: () => void;
+    restore: () => void;
+  } | null>;
+  /** Notify parent that a category job was queued so stats/polling can start. */
+  onJobQueued?: () => void;
 };
 
 function readStoreHash(): string {
@@ -49,9 +66,13 @@ function readStoreHash(): string {
 
 export default function CategoryImageListing({
   refreshNonce = 0,
+  pollNonce = 0,
   headerSelectAllChecked = false,
   headerSelectAllSignal = 0,
   onHeaderSelectAllStateChange,
+  onBulkActionsStateChange,
+  bulkActionsRef,
+  onJobQueued,
 }: CategoryImageListingProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,56 +89,90 @@ export default function CategoryImageListing({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [isBulkOptimizing, setIsBulkOptimizing] = useState(false);
   const [isBulkRestoring, setIsBulkRestoring] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const pollNonceRef = useRef(pollNonce);
 
   const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
 
-  const loadCategories = useCallback(async (page: number, limit: number) => {
-    setIsLoading(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const storeHash = readStoreHash();
-      if (!storeHash) {
-        setError("Store hash not found.");
-        return;
+  const loadCategories = useCallback(
+    async (page: number, limit: number, options?: { silent?: boolean }) => {
+      const silent = options?.silent === true;
+      if (!silent) {
+        setIsLoading(true);
+        setError(null);
+        setMessage(null);
       }
 
-      const response = await fetchCategoryList({
-        storeHash,
-        page,
-        limit,
-      });
+      try {
+        const storeHash = readStoreHash();
+        if (!storeHash) {
+          if (!silent) {
+            setError("Store hash not found.");
+          }
+          return;
+        }
 
-      if (isApiError(response)) {
-        setError("Failed to load category images.");
-        return;
+        const response = await fetchCategoryList({
+          storeHash,
+          page,
+          limit,
+        });
+
+        if (isApiError(response)) {
+          if (!silent) {
+            setError("Failed to load category images.");
+          }
+          return;
+        }
+
+        if (isApiFailure(response)) {
+          if (!silent) {
+            setError(response.message || "Failed to load category images.");
+          }
+          return;
+        }
+
+        setCategories(mapApiCategories(response.data));
+        if (!silent) {
+          setMessage(response.message ?? null);
+        }
+        hasLoadedRef.current = true;
+
+        const serverTotalPages = response.pagination?.total_pages;
+        setTotalPages(
+          typeof serverTotalPages === "number" && serverTotalPages > 0
+            ? serverTotalPages
+            : 1,
+        );
+      } catch {
+        if (!silent) {
+          setError("Something went wrong while loading category images.");
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
       }
-
-      if (isApiFailure(response)) {
-        setError(response.message || "Failed to load category images.");
-        return;
-      }
-
-      setCategories(mapApiCategories(response.data));
-      setMessage(response.message ?? null);
-
-      const serverTotalPages = response.pagination?.total_pages;
-      setTotalPages(
-        typeof serverTotalPages === "number" && serverTotalPages > 0
-          ? serverTotalPages
-          : 1,
-      );
-    } catch {
-      setError("Something went wrong while loading category images.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
-    void loadCategories(currentPage, perPage);
+    // Initial load, page/per-page change, or manual refresh → listing skeleton.
+    void loadCategories(currentPage, perPage, { silent: false });
   }, [loadCategories, currentPage, perPage, refreshNonce]);
+
+  useEffect(() => {
+    // Active-job poll bumps only — keep rows visible (like product silent refresh).
+    if (pollNonceRef.current === pollNonce) {
+      return;
+    }
+    pollNonceRef.current = pollNonce;
+    if (!hasLoadedRef.current) {
+      return;
+    }
+    void loadCategories(currentPage, perPage, { silent: true });
+  }, [loadCategories, currentPage, perPage, pollNonce]);
 
   const handlePreview = useCallback(
     (image: ContextualImage) => {
@@ -312,10 +367,20 @@ export default function CategoryImageListing({
   const handleSelectAll = useCallback(
     (checked: boolean) => {
       setSelectedIds(
-        checked ? new Set(bulkEligible.map((c) => c.id)) : new Set(),
+        checked
+          ? new Set(
+              categories
+                .filter(
+                  (c) =>
+                    (c.canOptimize && c.hasImage && !c.isOptimized) ||
+                    (c.isOptimized && c.hasImage),
+                )
+                .map((c) => c.id),
+            )
+          : new Set(),
       );
     },
-    [bulkEligible],
+    [categories],
   );
 
   useEffect(() => {
@@ -383,9 +448,10 @@ export default function CategoryImageListing({
           `${items.length} categor${items.length === 1 ? "y" : "ies"} queued for optimization.`,
       );
       setSelectedIds(new Set());
+      onJobQueued?.();
 
       // Reload the page to reflect updated statuses from the server
-      void loadCategories(currentPage, perPage);
+      void loadCategories(currentPage, perPage, { silent: true });
     } catch (err) {
       setError(
         err instanceof Error
@@ -395,7 +461,7 @@ export default function CategoryImageListing({
     } finally {
       setIsBulkOptimizing(false);
     }
-  }, [categories, selectedIds, currentPage, perPage, loadCategories]);
+  }, [categories, selectedIds, currentPage, perPage, loadCategories, onJobQueued]);
 
   const handleBulkRestore = useCallback(async () => {
     // Only send categories that are selected AND already optimized (have an optimized image)
@@ -445,7 +511,8 @@ export default function CategoryImageListing({
           `${queued} categor${queued === 1 ? "y" : "ies"} queued for restore.`,
       );
       setSelectedIds(new Set());
-      void loadCategories(currentPage, perPage);
+      onJobQueued?.();
+      void loadCategories(currentPage, perPage, { silent: true });
     } catch (err) {
       setError(
         err instanceof Error
@@ -455,7 +522,39 @@ export default function CategoryImageListing({
     } finally {
       setIsBulkRestoring(false);
     }
-  }, [categories, selectedIds, currentPage, perPage, loadCategories]);
+  }, [categories, selectedIds, currentPage, perPage, loadCategories, onJobQueued]);
+
+  useEffect(() => {
+    onBulkActionsStateChange?.({
+      selectedCount: selectedIds.size,
+      selectedOptimizeCount,
+      selectedRestoreCount,
+      isBulkOptimizing,
+      isBulkRestoring,
+    });
+  }, [
+    selectedIds.size,
+    selectedOptimizeCount,
+    selectedRestoreCount,
+    isBulkOptimizing,
+    isBulkRestoring,
+    onBulkActionsStateChange,
+  ]);
+
+  useEffect(() => {
+    if (!bulkActionsRef) {
+      return undefined;
+    }
+
+    bulkActionsRef.current = {
+      optimize: () => void handleBulkOptimize(),
+      restore: () => void handleBulkRestore(),
+    };
+
+    return () => {
+      bulkActionsRef.current = null;
+    };
+  }, [bulkActionsRef, handleBulkOptimize, handleBulkRestore]);
 
   const goToPage = useCallback((page: number) => {
     setSelectedIds(new Set());
@@ -478,72 +577,45 @@ export default function CategoryImageListing({
       (category.isOptimized && category.hasImage),
   }));
 
-  if (isLoading && categories.length === 0) {
-    return (
-      <div className="flex items-center justify-center gap-3 rounded-lg border bg-gray-50 px-4 py-10 text-sm text-gray-600">
-        <span className="inline-block size-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-        Loading category images…
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
-      {error ? (
+      {error && !isLoading ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       ) : null}
 
-      {isLoading && categories.length > 0 ? (
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="inline-block size-3 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
-          Updating…
-        </div>
-      ) : null}
-
-      {message && !error ? (
+      {message && !error && !isLoading ? (
         <p className="text-sm text-gray-600">{message}</p>
       ) : null}
 
       <div className="rounded-xl border bg-white">
-        {/* Bulk-action toolbar */}
-        {bulkEligible.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-end gap-3 border-b px-4 py-2">
-            {selectedIds.size > 0 ? (
-              <div className="flex gap-2">
-                {selectedOptimizeCount > 0 ? (
-                  <button
-                    type="button"
-                    disabled={isBulkOptimizing}
-                    onClick={handleBulkOptimize}
-                    className="custom-btn"
-                  >
-                    {isBulkOptimizing
-                      ? "Optimizing…"
-                      : `Optimize (${selectedOptimizeCount})`}
-                  </button>
-                ) : null}
-
-                {selectedRestoreCount > 0 ? (
-                  <button
-                    type="button"
-                    disabled={isBulkRestoring}
-                    onClick={handleBulkRestore}
-                    className="btn-default"
-                  >
-                    {isBulkRestoring
-                      ? "Restoring…"
-                      : `Restore (${selectedRestoreCount})`}
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
         <div className="h-[520px] overflow-y-auto p-3">
-          {rows.length === 0 && !isLoading ? (
+          {isLoading ? (
+            <div
+              className="space-y-3"
+              aria-busy="true"
+              aria-label="Loading category images"
+            >
+              {Array.from({ length: Math.min(perPage, 10) }, (_, index) => (
+                <div
+                  key={`category-skeleton-${index}`}
+                  className="flex items-center gap-3 rounded-[12px] border border-[rgba(0,0,0,0.08)] bg-[#F8FAFC] p-3"
+                >
+                  <div className="size-4 shrink-0 animate-pulse rounded bg-gray-200" />
+                  <div className="size-10 shrink-0 animate-pulse rounded bg-gray-200" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="h-3.5 w-2/5 max-w-[220px] animate-pulse rounded bg-gray-200" />
+                    <div className="h-3 w-1/4 max-w-[120px] animate-pulse rounded bg-gray-100" />
+                  </div>
+                  <div className="ml-auto hidden items-center gap-2 sm:flex">
+                    <div className="h-7 w-16 animate-pulse rounded-lg bg-gray-200" />
+                    <div className="h-7 w-16 animate-pulse rounded-lg bg-gray-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : rows.length === 0 ? (
             <div className="rounded-lg border bg-gray-50 px-4 py-10 text-center text-sm text-gray-600">
               No category images found.
             </div>
@@ -557,7 +629,9 @@ export default function CategoryImageListing({
                   isBusy={Boolean(optimizingKeys[image.key])}
                   isRestoring={Boolean(restoringKeys[image.key])}
                   onSelect={isEligibleForBulk ? handleSelectRow : undefined}
-                  onOptimize={hasImage ? handleOptimize : undefined}
+                  onOptimize={
+                    hasImage && !image.isOptimized ? handleOptimize : undefined
+                  }
                   onRestore={image.isOptimized ? handleRestore : undefined}
                   onPreview={image.isOptimized ? handlePreview : undefined}
                 />

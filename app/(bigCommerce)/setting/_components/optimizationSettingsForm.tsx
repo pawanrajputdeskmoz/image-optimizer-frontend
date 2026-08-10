@@ -10,6 +10,7 @@ import {
   readChannelId,
 } from "@/app/_lib/channelStorage";
 import { isApiError, isApiFailure } from "../../dashboard/_lib/apiUtils";
+import { fetchDashboardStats } from "../../dashboard/_lib/imageOptimizerApi";
 import TemplateBox from "./templateBox";
 import OptimizationModeCard, {
   type OptimizationModeId,
@@ -34,6 +35,10 @@ type UseOptimizationSettingsOptions = {
   enabled?: boolean;
 };
 
+function isFreePlanSlug(plan: string | null | undefined) {
+  return String(plan || "free").trim().toLowerCase() === "free";
+}
+
 export function useOptimizationSettings({
   enabled = true,
 }: UseOptimizationSettingsOptions = {}) {
@@ -42,6 +47,7 @@ export function useOptimizationSettings({
   );
   const [savePending, setSavePending] = useState(false);
   const [baseline, setBaseline] = useState<SettingsRow | null>(null);
+  const [isFreePlan, setIsFreePlan] = useState(false);
 
   const [channelId, setChannelId] = useState<number>(() => readChannelId());
   const [optimizeImageEnabled, setOptimizeImageEnabled] = useState(true);
@@ -59,7 +65,8 @@ export function useOptimizationSettings({
   const [autoOptimize, setAutoOptimize] = useState(true);
   const [autoOptimizeCategory, setAutoOptimizeCategory] = useState(true);
 
-  const cruiseControlEnabled = autoOptimize && autoOptimizeCategory;
+  const cruiseControlEnabled =
+    !isFreePlan && autoOptimize && autoOptimizeCategory;
   const formatConversionEnabled = outputFormat !== "original";
 
   const formatRadioOptions = useMemo(() => {
@@ -76,7 +83,11 @@ export function useOptimizationSettings({
     ];
   }, [outputFormat]);
 
-  function pushRow(row: SettingsRow) {
+  function pushRow(row: SettingsRow, freePlan = false) {
+    const autoProduct = freePlan ? false : row.auto_optimize_new_images;
+    const autoCategory = freePlan
+      ? false
+      : row.auto_optimize_new_category_images;
     setChannelId(row.channel_id);
     setOptimizeImageEnabled(row.optimize_image_enabled);
     setIsFilenameTemplateEnabled(row.is_filename_template_enabled);
@@ -85,9 +96,13 @@ export function useOptimizationSettings({
     setAltTextTemplate(row.alt_text_template);
     setQuality(row.image_quality);
     setOutputFormat(row.output_format);
-    setAutoOptimize(row.auto_optimize_new_images);
-    setAutoOptimizeCategory(row.auto_optimize_new_category_images);
-    setBaseline(row);
+    setAutoOptimize(autoProduct);
+    setAutoOptimizeCategory(autoCategory);
+    setBaseline({
+      ...row,
+      auto_optimize_new_images: autoProduct,
+      auto_optimize_new_category_images: autoCategory,
+    });
   }
 
   const hasUnsavedChanges = useMemo(() => {
@@ -123,19 +138,29 @@ export function useOptimizationSettings({
     const cid = readChannelId();
     setChannelId(cid);
 
-    const data = await ApiCall("settings", {}, { method: "GET" });
+    const [data, statsRes] = await Promise.all([
+      ApiCall("settings", {}, { method: "GET" }),
+      fetchDashboardStats(),
+    ]);
+
+    const freePlan =
+      !isApiFailure(statsRes) && statsRes.data?.image_quota
+        ? isFreePlanSlug(statsRes.data.image_quota.plan)
+        : false;
+    setIsFreePlan(freePlan);
+
     if (isApiError(data)) {
       setLoadState("error");
-      pushRow(applyDefaults(cid));
+      pushRow(applyDefaults(cid), freePlan);
       return;
     }
     const row = parseSettings(data);
     if (!row) {
       setLoadState("error");
-      pushRow(applyDefaults(cid));
+      pushRow(applyDefaults(cid), freePlan);
       return;
     }
-    pushRow(row);
+    pushRow(row, freePlan);
     setLoadState("ready");
   }
 
@@ -160,6 +185,7 @@ export function useOptimizationSettings({
   }, [enabled]);
 
   async function handleCruiseControlToggle() {
+    if (isFreePlan) return;
     const next = !cruiseControlEnabled;
     setAutoOptimize(next);
     setAutoOptimizeCategory(next);
@@ -189,6 +215,8 @@ export function useOptimizationSettings({
   async function handleSave(): Promise<boolean> {
     setSavePending(true);
     try {
+      const autoProduct = isFreePlan ? false : autoOptimize;
+      const autoCategory = isFreePlan ? false : autoOptimizeCategory;
       const payload: SettingsRow = {
         channel_id: readChannelId(),
         optimization_mode: optimizeImageEnabled
@@ -203,8 +231,8 @@ export function useOptimizationSettings({
         alt_text_template: altTextTemplate,
         image_quality: quality,
         output_format: outputFormat,
-        auto_optimize_new_images: autoOptimize,
-        auto_optimize_new_category_images: autoOptimizeCategory,
+        auto_optimize_new_images: autoProduct,
+        auto_optimize_new_category_images: autoCategory,
       };
       const data = await ApiCall("settings", payload, {
         method: "PUT",
@@ -221,11 +249,13 @@ export function useOptimizationSettings({
 
       const cruiseChanged =
         !baseline ||
-        baseline.auto_optimize_new_images !== autoOptimize ||
-        baseline.auto_optimize_new_category_images !== autoOptimizeCategory;
+        baseline.auto_optimize_new_images !== autoProduct ||
+        baseline.auto_optimize_new_category_images !== autoCategory;
 
       if (cruiseChanged) {
-        const webhookOk = await syncCruiseControlWebhooks(cruiseControlEnabled);
+        const webhookOk = await syncCruiseControlWebhooks(
+          !isFreePlan && autoProduct && autoCategory,
+        );
         if (!webhookOk) {
           toast.error("Could not update Cruise Control webhooks");
           return false;
@@ -234,11 +264,14 @@ export function useOptimizationSettings({
 
       const row = parseSettings(data);
       if (row) {
-        pushRow({
-          ...row,
-          auto_optimize_new_images: autoOptimize,
-          auto_optimize_new_category_images: autoOptimizeCategory,
-        });
+        pushRow(
+          {
+            ...row,
+            auto_optimize_new_images: autoProduct,
+            auto_optimize_new_category_images: autoCategory,
+          },
+          isFreePlan,
+        );
       } else {
         setBaseline(payload);
       }
@@ -285,6 +318,7 @@ export function useOptimizationSettings({
     setAltTextTemplate,
     cruiseControlEnabled,
     handleCruiseControlToggle,
+    isFreePlan,
   };
 }
 
@@ -325,6 +359,7 @@ export function OptimizationSettingsForm({
     setAltTextTemplate,
     cruiseControlEnabled,
     handleCruiseControlToggle,
+    isFreePlan,
   } = settings;
 
   const fillPercent = sliderFillPercent(quality);
@@ -366,10 +401,15 @@ export function OptimizationSettingsForm({
           <p className="text-xs text-[#616161] font-normal mb-0">
             Auto-optimize new product and category images as they arrive
           </p>
+          {isFreePlan ? (
+            <p className="mt-1 mb-0 text-[11px] font-medium text-[#8A5A00]">
+              Available on paid plans — upgrade to enable
+            </p>
+          ) : null}
         </div>
         <VcToggleSwitch
           enabled={cruiseControlEnabled}
-          disabled={loadState === "loading"}
+          disabled={loadState === "loading" || isFreePlan}
           onToggle={() => void handleCruiseControlToggle()}
           label={
             cruiseControlEnabled

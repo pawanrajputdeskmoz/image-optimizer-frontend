@@ -96,6 +96,7 @@ export type SingleImageOptimizationResponse = {
   message?: string;
   data?: {
     status?: string;
+    metadata_only?: boolean;
     skip_reason?: string;
     old_image_id?: string | number;
     new_image_id?: number;
@@ -213,6 +214,8 @@ export type ImageActionPayload = {
   shop: string;
   channel_id: number;
   store_id: string;
+  /** Existing BC description; used to preserve alt when generator is off */
+  alt_text?: string;
 };
 
 /** @deprecated Use ImageActionPayload */

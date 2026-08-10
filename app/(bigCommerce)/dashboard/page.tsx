@@ -25,7 +25,9 @@ import AltTextField from "./_components/altTextField";
 import RestoreConfirmModal from "./_components/restoreConfirmModal";
 import OptimizeConfirmModal from "./_components/optimizeConfirmModal";
 import BrandImageListing from "./_components/brandImageListing";
-import CategoryImageListing from "./_components/categoryImageListing";
+import CategoryImageListing, {
+  type CategoryBulkActionsState,
+} from "./_components/categoryImageListing";
 import DashboardStatsCards from "./_components/dashboardStatsCards";
 import ImageCompareModal from "./_components/imageCompareModal";
 import ListingPagination from "./_components/listingPagination";
@@ -51,6 +53,7 @@ import {
 } from "./_lib/imageOptimizerApi";
 import {
   PLACEHOLDER_IMAGE,
+  applyMetadataOnlyResult,
   applyOptimizationResult,
   applyRestoreResult,
   getThumbnailImage,
@@ -178,6 +181,7 @@ export default function DashboardPage() {
   const [productsRefreshNonce, setProductsRefreshNonce] = useState(0);
   const [listingPollNonce, setListingPollNonce] = useState(0);
   const [activeJob, setActiveJob] = useState(false);
+  const [activeCategoryJob, setActiveCategoryJob] = useState(false);
   const [quotaUsed, setQuotaUsed] = useState<number | null>(null);
   const [quotaLimit, setQuotaLimit] = useState<number | null>(null);
   const [pendingRestoreCount, setPendingRestoreCount] = useState(0);
@@ -190,6 +194,18 @@ export default function DashboardPage() {
     useState(true);
   const [contextualHeaderSelectAllSignal, setContextualHeaderSelectAllSignal] =
     useState(0);
+  const [categoryBulkState, setCategoryBulkState] =
+    useState<CategoryBulkActionsState>({
+      selectedCount: 0,
+      selectedOptimizeCount: 0,
+      selectedRestoreCount: 0,
+      isBulkOptimizing: false,
+      isBulkRestoring: false,
+    });
+  const categoryBulkActionsRef = useRef<{
+    optimize: () => void;
+    restore: () => void;
+  } | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [productActionPending, setProductActionPending] = useState<
     Record<string, true>
@@ -553,6 +569,8 @@ export default function DashboardPage() {
       const skippedTotal = alreadyOptimizedCount + skippedByApi;
 
       setBulkSelected({});
+      // Keep rows visible — no listing skeleton after checkbox optimize.
+      silentListingRefreshRef.current = true;
       setProductsRefreshNonce((n) => n + 1);
       toast.success(
         response.message ||
@@ -828,6 +846,8 @@ export default function DashboardPage() {
 
       toast.success(response.message || "Images restored");
       setBulkSelected({});
+      // Keep rows visible — no listing skeleton after checkbox restore.
+      silentListingRefreshRef.current = true;
       setProductsRefreshNonce((n) => n + 1);
 
       const queued = response?.data?.queued;
@@ -864,12 +884,23 @@ export default function DashboardPage() {
           return;
         }
 
-        if (response.success !== true || result?.status !== "optimized") {
+        const isMetadataOnly = result?.metadata_only === true;
+        const isOptimized = result?.status === "optimized";
+
+        if (response.success !== true || (!isMetadataOnly && !isOptimized)) {
           if (response.message) {
             toast.error(response.message);
           }
           return;
         }
+
+        if (!result) {
+          return;
+        }
+
+        const applyResult = isMetadataOnly
+          ? applyMetadataOnlyResult
+          : applyOptimizationResult;
 
         setProducts((prev) =>
           prev.map((p) =>
@@ -878,7 +909,7 @@ export default function DashboardPage() {
               : {
                 ...p,
                 images: p.images.map((img) =>
-                  applyOptimizationResult(img, image.id, result)
+                  applyResult(img, image.id, result)
                 ),
               }
           )
@@ -900,11 +931,7 @@ export default function DashboardPage() {
 
           return {
             ...prev,
-            [productId]: applyOptimizationResult(
-              currentImage,
-              image.id,
-              result
-            ),
+            [productId]: applyResult(currentImage, image.id, result),
           };
         });
 
@@ -917,6 +944,13 @@ export default function DashboardPage() {
           delete next[newKey];
           return next;
         });
+
+        toast.success(
+          response.message ||
+            (isMetadataOnly
+              ? "Image metadata updated successfully"
+              : "Image optimized"),
+        );
       } finally {
         setOptimizingKeys((prev) => {
           if (!prev[key]) {
@@ -1044,7 +1078,10 @@ export default function DashboardPage() {
     setCurrentPage(nextPage);
   };
 
-  const refreshListing = useCallback(() => {
+  const refreshListing = useCallback((options?: { silent?: boolean }) => {
+    if (options?.silent) {
+      silentListingRefreshRef.current = true;
+    }
     setProductsRefreshNonce((n) => n + 1);
   }, []);
 
@@ -1112,7 +1149,7 @@ export default function DashboardPage() {
           return;
         }
         toast.success(response.message || "Product images queued for optimization");
-        refreshListing();
+        refreshListing({ silent: true });
 
         const queued = response?.data?.queued;
         if (typeof queued === "number" && queued <= 0) {
@@ -1166,7 +1203,7 @@ export default function DashboardPage() {
           return;
         }
         toast.success(response.message || "Product images queued for restore");
-        refreshListing();
+        refreshListing({ silent: true });
 
         const queued = response?.data?.queued;
         if (typeof queued === "number" && queued <= 0) {
@@ -1433,6 +1470,14 @@ export default function DashboardPage() {
     setContextualHeaderSelectAllChecked(false);
     setContextualHeaderSelectAllVisible(false);
     setContextualHeaderSelectAllDisabled(true);
+    setCategoryBulkState({
+      selectedCount: 0,
+      selectedOptimizeCount: 0,
+      selectedRestoreCount: 0,
+      isBulkOptimizing: false,
+      isBulkRestoring: false,
+    });
+    categoryBulkActionsRef.current = null;
   }, [listType]);
 
   const handleContextualHeaderSelectAllStateChange = useCallback(
@@ -1473,6 +1518,11 @@ export default function DashboardPage() {
         active_job?: boolean;
         pending_mode?: "optimize" | "restore";
         pending_restore_images?: { value?: number };
+        active_bulk_jobs?: {
+          product?: boolean;
+          category?: boolean;
+          brand?: boolean;
+        };
         active_bulk_restores?: {
           product?: boolean;
           category?: boolean;
@@ -1484,6 +1534,7 @@ export default function DashboardPage() {
         setQuotaUsed(null);
         setQuotaLimit(null);
         setActiveJob(false);
+        setActiveCategoryJob(false);
         setPendingRestoreCount(0);
         setActiveBulkRestore(false);
         return;
@@ -1494,8 +1545,12 @@ export default function DashboardPage() {
           ? stats.pending_restore_images.value
           : 0;
       const restores = stats.active_bulk_restores;
+      const jobs = stats.active_bulk_jobs;
       const bulkRestoreActive = Boolean(
         restores?.product || restores?.category || restores?.brand
+      );
+      const categoryJobActive = Boolean(
+        jobs?.category || restores?.category
       );
       const restoreActive =
         stats.active_job === true ||
@@ -1505,6 +1560,7 @@ export default function DashboardPage() {
       setQuotaUsed(stats.image_quota.used);
       setQuotaLimit(stats.image_quota.limit);
       setActiveJob(stats.active_job === true);
+      setActiveCategoryJob(categoryJobActive);
       setPendingRestoreCount(restoreCount);
       setActiveBulkRestore(bulkRestoreActive);
 
@@ -1536,8 +1592,9 @@ export default function DashboardPage() {
     Object.keys(restoringKeys).length > 0 ||
     Object.keys(productActionPending).some((key) => key.startsWith("res-"));
 
-  // While a bulk job is running, silently poll the listing (same cadence as stats).
-  // When the job finishes (active_job true → false), do one final silent refresh
+  // While a bulk job is running, silently poll the listing.
+  // Category jobs refresh every 15s; other entity jobs every 10s.
+  // When the job finishes (active → false), do one final silent refresh
   // and clear queued action loaders.
   useEffect(() => {
     const bumpSilentListing = () => {
@@ -1545,9 +1602,14 @@ export default function DashboardPage() {
       setListingPollNonce((n) => n + 1);
     };
 
-    if (activeJob) {
+    const shouldPoll =
+      activeJob || (listType === "categories" && activeCategoryJob);
+
+    if (shouldPoll) {
       wasActiveJobRef.current = true;
-      const interval = window.setInterval(bumpSilentListing, 10000);
+      const intervalMs =
+        listType === "categories" && activeCategoryJob ? 15000 : 10000;
+      const interval = window.setInterval(bumpSilentListing, intervalMs);
       return () => window.clearInterval(interval);
     }
 
@@ -1558,7 +1620,7 @@ export default function DashboardPage() {
     }
 
     return undefined;
-  }, [activeJob, clearQueuedActionLoaders]);
+  }, [activeJob, activeCategoryJob, listType, clearQueuedActionLoaders]);
 
   return (
     <div>
@@ -1628,7 +1690,7 @@ export default function DashboardPage() {
 
             <OptimizationSettingsDialog />
 
-            {bulkSelectedCount > 0 ? (
+            {listType === "product" && bulkSelectedCount > 0 ? (
               <>
                 {bulkSelectedOptimizedCount > 0 ? (
                   <button
@@ -1655,6 +1717,38 @@ export default function DashboardPage() {
                     <ButtonLoader label="Optimizing…" />
                   ) : (
                     `Optimize (${bulkSelectedNotOptimizedCount > 0 ? bulkSelectedNotOptimizedCount : bulkSelectedCount})`
+                  )}
+                </button>
+              </>
+            ) : null}
+
+            {listType === "categories" && categoryBulkState.selectedCount > 0 ? (
+              <>
+                {categoryBulkState.selectedRestoreCount > 0 ? (
+                  <button
+                    type="button"
+                    disabled={categoryBulkState.isBulkRestoring}
+                    onClick={() => categoryBulkActionsRef.current?.restore()}
+                    className="btn-default"
+                  >
+                    {categoryBulkState.isBulkRestoring ? (
+                      <ButtonLoader label="Restoring…" />
+                    ) : (
+                      `Restore (${categoryBulkState.selectedRestoreCount})`
+                    )}
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  disabled={categoryBulkState.isBulkOptimizing}
+                  onClick={() => categoryBulkActionsRef.current?.optimize()}
+                  className="custom-btn"
+                >
+                  {categoryBulkState.isBulkOptimizing ? (
+                    <ButtonLoader label="Optimizing…" />
+                  ) : (
+                    `Optimize (${categoryBulkState.selectedOptimizeCount > 0 ? categoryBulkState.selectedOptimizeCount : categoryBulkState.selectedCount})`
                   )}
                 </button>
               </>
@@ -1777,7 +1871,7 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              onClick={refreshListing}
+              onClick={() => refreshListing()}
               disabled={isLoadingProducts}
               className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg border border-[#D1D1D1] bg-white text-[#303030] hover:bg-[#FAFAFA] disabled:opacity-50"
               aria-label="Refresh"
@@ -1803,10 +1897,14 @@ export default function DashboardPage() {
 
         {listType === "categories" ? (
           <CategoryImageListing
-            refreshNonce={listingRefreshKey}
+            refreshNonce={productsRefreshNonce}
+            pollNonce={listingPollNonce}
             headerSelectAllChecked={contextualHeaderSelectAllChecked}
             headerSelectAllSignal={contextualHeaderSelectAllSignal}
             onHeaderSelectAllStateChange={handleContextualHeaderSelectAllStateChange}
+            onBulkActionsStateChange={setCategoryBulkState}
+            bulkActionsRef={categoryBulkActionsRef}
+            onJobQueued={() => setProductsRefreshNonce((n) => n + 1)}
           />
         ) : null}
 

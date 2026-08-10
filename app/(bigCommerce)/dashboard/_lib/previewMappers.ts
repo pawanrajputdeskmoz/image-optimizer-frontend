@@ -1,4 +1,5 @@
 import { storageFilePathToPublicUrl } from "./previewFiles";
+import { formatBytesToKb } from "./productMappers";
 import type { PreviewImageData } from "../types";
 
 export type ProductPreviewView = {
@@ -18,7 +19,7 @@ function formatBytesLabel(bytes?: number | null): string | null {
   if (typeof bytes !== "number" || !Number.isFinite(bytes)) {
     return null;
   }
-  return `${(bytes / 1024).toFixed(1)} KB`;
+  return formatBytesToKb(bytes);
 }
 
 function resolveSizeLabel(

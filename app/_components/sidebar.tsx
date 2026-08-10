@@ -1,6 +1,6 @@
 "use client";
 
-import { useSelectedLayoutSegment } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { basePath } from "@/app/lib/basePath";
 import Link from "next/link";
@@ -25,7 +25,8 @@ export default function Sidebar({
 }: {
   handleOnChange?: () => void;
 }) {
-  const segment = useSelectedLayoutSegment() || "dashboard";
+  const pathname = usePathname();
+  const segment = pathname?.split("/").filter(Boolean)[0] ?? "";
 
   return (
     <>
@@ -45,7 +46,7 @@ export default function Sidebar({
                 <div className="menu-hover-logo align-item-center gap-3">
                   <Image
                     src={`${basePath}/images/logo.svg`}
-                    alt=""
+                    alt="Image Optimizer"
                     width={155}
                     height={34}
                   />

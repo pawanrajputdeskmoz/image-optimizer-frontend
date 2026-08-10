@@ -5,7 +5,7 @@ export function buildImageActionPayload(
   productId: number,
   image: ImageItem,
 ): ImageActionPayload {
-  return {
+  const payload: ImageActionPayload = {
     image_id: image.id,
     product_id: productId,
     image_url: image.imageFile,
@@ -21,6 +21,13 @@ export function buildImageActionPayload(
         ? localStorage.getItem("user_id") ?? ""
         : "",
   };
+
+  // Backup for preserve-when-generator-off; backend still prefers BC description.
+  if (typeof image.alt === "string" && image.alt.trim()) {
+    payload.alt_text = image.alt.trim();
+  }
+
+  return payload;
 }
 
 /** @deprecated Use buildImageActionPayload */

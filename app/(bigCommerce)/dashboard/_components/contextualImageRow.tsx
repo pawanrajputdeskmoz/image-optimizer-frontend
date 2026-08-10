@@ -170,28 +170,28 @@ export default function ContextualImageRow({
           </button>
         ) : null}
 
-        <button
-          type="button"
-          disabled={isOptimizeDisabled}
-          title={
-            image.sourceType === "category" &&
-            (image.status === "no_image" || !image.isUpdateSupported)
-              ? "No image available for this category"
-              : carouselLimited && !image.isOptimized
-                ? CAROUSEL_ROW_NOTE_TITLE
-                : undefined
-          }
-          onClick={() => onOptimize?.(image)}
-          className={`${
-            image.isOptimized ? "btn-default" : "custom-btn"
-          } ${
-            image.sourceType === "category" && image.status === "no_image"
-              ? "!bg-[#9a9a9a] !shadow-none"
-              : ""
-          }`}
-        >
-          {optimizeButtonLabel}
-        </button>
+        {!image.isOptimized ? (
+          <button
+            type="button"
+            disabled={isOptimizeDisabled}
+            title={
+              image.sourceType === "category" &&
+              (image.status === "no_image" || !image.isUpdateSupported)
+                ? "No image available for this category"
+                : carouselLimited
+                  ? CAROUSEL_ROW_NOTE_TITLE
+                  : undefined
+            }
+            onClick={() => onOptimize?.(image)}
+            className={`custom-btn ${
+              image.sourceType === "category" && image.status === "no_image"
+                ? "!bg-[#9a9a9a] !shadow-none"
+                : ""
+            }`}
+          >
+            {optimizeButtonLabel}
+          </button>
+        ) : null}
       </div>
     </div>
   );
