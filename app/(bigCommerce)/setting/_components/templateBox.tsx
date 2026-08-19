@@ -5,11 +5,10 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import { Code2, Eye, FileImage } from "lucide-react";
+import { Eye, FileImage } from "lucide-react";
 
 import {
   TEMPLATE_VARIABLES,
@@ -35,7 +34,7 @@ type TemplateBoxProps = {
 };
 
 const CHIP_CLASS =
-  "m-[1px] inline-flex max-w-full items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 align-middle text-[12px] leading-tight text-gray-800 select-none";
+  "mx-1 my-0.5 inline-flex max-w-full items-center gap-1 rounded-md border border-gray-200 bg-gray-100 px-2 align-middle text-[12px] leading-tight text-gray-800 select-none";
 
 function serializeEditor(root: HTMLElement): string {
   let result = "";
@@ -228,22 +227,6 @@ function captureEditorSelection(
   savedRangeRef.current = selection.getRangeAt(0).cloneRange();
 }
 
-function restoreEditorSelection(
-  editor: HTMLElement,
-  savedRange: Range | null,
-) {
-  if (!savedRange) return;
-  const selection = window.getSelection();
-  if (!selection) return;
-
-  try {
-    selection.removeAllRanges();
-    selection.addRange(savedRange);
-  } catch {
-    placeCaretAtEnd(editor);
-  }
-}
-
 function getChipBeforeCursor(editor: HTMLElement): HTMLElement | null {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return null;
@@ -291,14 +274,7 @@ export default function TemplateBox({
   outputFormat = "webp",
   variant = "card",
 }: TemplateBoxProps) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [dropdownPlacement, setDropdownPlacement] = useState<"bottom" | "top">(
-    previewMode === "alt" ? "top" : "bottom",
-  );
-  const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const lastSyncedTemplateRef = useRef(templateValue);
   const savedRangeRef = useRef<Range | null>(null);
 
@@ -359,12 +335,11 @@ export default function TemplateBox({
 
       const editor = editorRef.current;
       editor.focus();
-      restoreEditorSelection(editor, savedRangeRef.current);
+      placeCaretAtEnd(editor);
       insertAtCursor(createChipElement(variable), editor);
       ensureTrailingEditableTextNode(editor);
       syncFromEditor();
       saveSelection();
-      setPickerOpen(false);
     },
     [enabled, saveSelection, syncFromEditor],
   );
@@ -448,56 +423,10 @@ export default function TemplateBox({
     }
   };
 
-  useEffect(() => {
-    if (!pickerOpen) return;
-
-    const onPointerDown = (event: globalThis.MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setPickerOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [pickerOpen]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-
-    // Alt Text Template: always open upward so the list stays visible in the modal.
-    if (previewMode === "alt") {
-      setDropdownPlacement("top");
-      return;
-    }
-
-    const updatePlacement = () => {
-      const triggerRect = triggerRef.current?.getBoundingClientRect();
-      if (!triggerRect) return;
-
-      const dropdownHeight = dropdownRef.current?.offsetHeight ?? 224;
-      const spaceBelow = window.innerHeight - triggerRect.bottom;
-      const spaceAbove = triggerRect.top;
-
-      setDropdownPlacement(
-        spaceBelow < dropdownHeight + 12 && spaceAbove > spaceBelow
-          ? "top"
-          : "bottom",
-      );
-    };
-
-    updatePlacement();
-    window.addEventListener("resize", updatePlacement);
-    window.addEventListener("scroll", updatePlacement, true);
-    return () => {
-      window.removeEventListener("resize", updatePlacement);
-      window.removeEventListener("scroll", updatePlacement, true);
-    };
-  }, [pickerOpen, previewMode]);
-
   const showPlaceholder = enabled && !templateValue.trim();
 
   const editor = (
-    <div ref={containerRef} className="space-y-2">
+    <div className="space-y-2">
       <div
         className={`relative rounded-[6px] border border-[#8A8A8A] bg-[#FDFDFD] ${
           !enabled ? "opacity-60" : ""
@@ -538,66 +467,38 @@ export default function TemplateBox({
             syncFromEditor();
             saveSelection();
           }}
-          className={`min-h-10 w-full overflow-hidden px-3 py-2 pr-11 text-[12px] font-normal leading-5 whitespace-pre-wrap wrap-break-word text-[#303030] outline-none ${
+          className={`min-h-10 w-full overflow-hidden px-3 py-2 text-[12px] font-normal leading-5 whitespace-pre-wrap wrap-break-word text-[#303030] outline-none ${
             showPlaceholder
               ? "empty:before:text-[#8A8A8A] empty:before:content-[attr(data-placeholder)]"
               : ""
           }`}
         />
-
-        <div className="absolute top-1.25 right-1.25">
-          <button
-            ref={triggerRef}
-            type="button"
-            disabled={!enabled}
-            onMouseDown={(event) => {
-              event.preventDefault();
-              saveSelection();
-            }}
-            onClick={() => setPickerOpen((open) => !open)}
-            className="inline-flex size-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Add variable"
-            aria-expanded={pickerOpen}
-          >
-            <Code2 className="size-4" />
-          </button>
-
-          {pickerOpen && enabled ? (
-            <div
-              ref={dropdownRef}
-              className={`absolute right-0 z-30 max-h-56 w-52 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg ${
-                dropdownPlacement === "top"
-                  ? "bottom-full mb-1"
-                  : "top-full mt-1"
-              }`}
-            >
-              {TEMPLATE_VARIABLES.map((variable) => (
-                <button
-                  key={variable.id}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => insertVariable(variable.id)}
-                  className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="font-medium">{variable.label}</span>
-                  <span className="mt-0.5 block text-xs text-gray-400">
-                    [{variable.id}]
-                  </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
       </div>
+
+      {enabled ? (
+        <div className="flex flex-wrap gap-2">
+          {TEMPLATE_VARIABLES.map((variable) => (
+            <button
+              key={variable.id}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => insertVariable(variable.id)}
+              className="inline-flex items-center rounded-lg border border-[#D1D1D1] bg-white px-2.5 py-1.5 text-xs font-medium text-[#303030] hover:bg-[#FAFAFA]"
+            >
+              + {variable.shortLabel}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {enabled ? (
         <div className="relative overflow-hidden rounded-xl border border-dashed border-[#D1D1D1] bg-[#F8F8F8] px-3.5 py-3">
           <div className="relative mb-2.5 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="inline-flex size-6 items-center justify-center rounded-md bg-white text-[#303030] shadow-sm ring-1 ring-[#E5E5E5]">
                 <Eye className="size-3.5" aria-hidden />
               </span>
-              <span className="text-[11px] font-semibold tracking-wide text-[#303030] uppercase mt-0.5">
+              <span className="text-[11px] font-semibold tracking-wide text-[#303030] uppercase">
                 Preview
               </span>
             </div>
@@ -609,7 +510,7 @@ export default function TemplateBox({
           <div className="relative rounded-lg bg-white px-3 py-2.5 shadow-sm ring-1 ring-[#E5E5E5]">
             {previewText ? (
               previewMode === "filename" ? (
-                <div className="flex min-w-0 items-start gap-2">
+                <div className="flex min-w-0 items-start gap-3">
                   <FileImage
                     className="mt-0.5 size-4 shrink-0 text-[#303030]"
                     aria-hidden

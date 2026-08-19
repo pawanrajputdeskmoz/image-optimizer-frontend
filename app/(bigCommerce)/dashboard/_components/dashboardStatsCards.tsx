@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 const ACTIVE_JOB_POLL_MS = 10000;
 
-type CardAccent = "orange" | "green" | "blue" | "purple";
+type CardAccent = "orange" | "green" | "blue";
 
 const ACCENTS: Record<
   CardAccent,
@@ -33,12 +33,6 @@ const ACCENTS: Record<
     subtitleColor: "#4F46E5",
     iconSrc: "/images/total-data-saved-icon.svg",
     iconAlt: "Total data saved",
-  },
-  purple: {
-    iconBg: "bg-[#FAF5FF]",
-    subtitleColor: "#A046E5",
-    iconSrc: "/images/image-quota-icon.svg",
-    iconAlt: "Image quota",
   },
 };
 
@@ -173,8 +167,8 @@ export default function DashboardStatsCards({
 
   if (initialLoading && !stats) {
     return (
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
           <StatCardSkeleton key={i} />
         ))}
       </div>
@@ -184,7 +178,7 @@ export default function DashboardStatsCards({
   if (!stats) return null;
 
   return (
-    <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
       <StatCard
         label="Pending Images"
         value={stats.pending_images.display}
@@ -204,13 +198,6 @@ export default function DashboardStatsCards({
         value={stats.total_data_saved.display}
         subtitle={stats.total_data_saved.subtitle}
         accent="blue"
-        valueLoading={refreshing}
-      />
-      <StatCard
-        label="Image Quota"
-        value={stats.image_quota.display}
-        subtitle={stats.image_quota.subtitle}
-        accent="purple"
         valueLoading={refreshing}
       />
     </div>

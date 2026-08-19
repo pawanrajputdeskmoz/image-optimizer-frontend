@@ -3,16 +3,18 @@ const TEMPLATE_TOKEN_RE =
   /\[(name|sku|brand|mpn|page_title|price|type|condition|category|currency|store_name|image_name|image_file|sort_order|image_id)\]/gi;
 
 export const TEMPLATE_VARIABLES = [
-  { id: "name", label: "Product name" },
-  { id: "sku", label: "SKU" },
-  { id: "price", label: "Price" },
-  { id: "currency", label: "Currency" },
-  { id: "type", label: "Type" },
-  { id: "category", label: "Category" },
-  { id: "brand", label: "Brand" },
-  { id: "mpn", label: "MPN" },
-  { id: "condition", label: "Condition" },
-  { id: "store_name", label: "Shop name" },
+  { id: "name", label: "Product name", shortLabel: "Name" },
+  { id: "sku", label: "SKU", shortLabel: "Sku" },
+  { id: "price", label: "Price", shortLabel: "Price" },
+  { id: "currency", label: "Currency", shortLabel: "Currency" },
+  { id: "type", label: "Type", shortLabel: "Type" },
+  { id: "category", label: "Category", shortLabel: "Category" },
+  { id: "brand", label: "Brand", shortLabel: "Brand" },
+  { id: "mpn", label: "MPN", shortLabel: "Mpn" },
+  { id: "condition", label: "Condition", shortLabel: "Condition" },
+  { id: "store_name", label: "Shop name", shortLabel: "Store Name" },
+  { id: "image_name", label: "Image name", shortLabel: "Image Name" },
+  { id: "image_file", label: "Image file", shortLabel: "Image File" },
 ] as const;
 
 export type TemplateVariableId = (typeof TEMPLATE_VARIABLES)[number]["id"];
@@ -28,6 +30,8 @@ export const SAMPLE_TEMPLATE_CONTEXT: Record<TemplateVariableId, string> = {
   mpn: "MPN-001",
   condition: "New",
   store_name: "teststoredes2025",
+  image_name: "sports-jacket",
+  image_file: "sports-jacket.jpg",
 };
 
 export function getVariableLabel(id: string) {
@@ -46,7 +50,7 @@ export function applyTemplatePreview(
       const key = String(token).toLowerCase();
       const value = context[key];
       return value != null && String(value).trim() !== ""
-        ? String(value).trim()
+        ? `${String(value).trim()} `
         : "";
     })
     .replace(/\s+/g, " ")

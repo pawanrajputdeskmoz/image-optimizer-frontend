@@ -263,41 +263,30 @@ export default function DashboardPage() {
   );
 
   const bulkSelectedCount = bulkSelectedList.length;
-  const bulkSelectedOptimizedCount = useMemo(() => {
-    if (bulkSelectedList.length === 0) return 0;
 
-    let count = 0;
+  const { selectedOptimizeImages, selectedRestoreImages } = useMemo(() => {
+    const optimize: ImageActionPayload[] = [];
+    const restore: ImageActionPayload[] = [];
+
     for (const item of bulkSelectedList) {
       const product = products.find((p) => p.id === item.product_id);
       const image = product?.images.find((img) => img.id === item.image_id);
-      if (image && isImageOptimized(image)) {
-        count += 1;
+      if (!image) continue;
+      if (isImageOptimized(image)) {
+        restore.push(item);
+      } else {
+        optimize.push(item);
       }
     }
-    return count;
+
+    return {
+      selectedOptimizeImages: optimize,
+      selectedRestoreImages: restore,
+    };
   }, [bulkSelectedList, products]);
 
-  const bulkSelectedOptimizedList = useMemo(() => {
-    if (bulkSelectedList.length === 0) return [];
-
-    return bulkSelectedList.filter((item) => {
-      const product = products.find((p) => p.id === item.product_id);
-      const image = product?.images.find((img) => img.id === item.image_id);
-      return Boolean(image && isImageOptimized(image));
-    });
-  }, [bulkSelectedList, products]);
-
-  const bulkSelectedNotOptimizedList = useMemo(() => {
-    if (bulkSelectedList.length === 0) return [];
-
-    return bulkSelectedList.filter((item) => {
-      const product = products.find((p) => p.id === item.product_id);
-      const image = product?.images.find((img) => img.id === item.image_id);
-      return Boolean(image && !isImageOptimized(image));
-    });
-  }, [bulkSelectedList, products]);
-
-  const bulkSelectedNotOptimizedCount = bulkSelectedNotOptimizedList.length;
+  const selectedOptimizeImageCount = selectedOptimizeImages.length;
+  const selectedRestoreImageCount = selectedRestoreImages.length;
 
   /*
   |--------------------------------------------------------------------------
@@ -518,9 +507,8 @@ export default function DashboardPage() {
       return;
     }
 
-    const payload = bulkSelectedNotOptimizedList;
-    const alreadyOptimizedCount =
-      bulkSelectedList.length - payload.length;
+    const payload = selectedOptimizeImages;
+    const alreadyOptimizedCount = selectedRestoreImages.length;
 
     if (!payload.length) {
       setAllOptimizedAlertOpen(true);
@@ -586,7 +574,7 @@ export default function DashboardPage() {
     } catch {
       clearSelectedOptimizeLoaders();
     }
-  }, [bulkSelectedList, bulkSelectedNotOptimizedList]);
+  }, [bulkSelectedList, selectedOptimizeImages, selectedRestoreImages]);
 
   const bulkOptimizeAll = useCallback(async () => {
     setBulkOptimizeAllPending(true);
@@ -801,7 +789,7 @@ export default function DashboardPage() {
   }, [bulkRestoreAllPending, clearRestoreActionLoaders]);
 
   const bulkRestoreSelected = useCallback(async () => {
-    const payload = bulkSelectedOptimizedList;
+    const payload = selectedRestoreImages;
 
     if (!payload.length) {
       return;
@@ -858,7 +846,7 @@ export default function DashboardPage() {
     } catch {
       clearSelectedRestoreLoaders();
     }
-  }, [bulkSelectedOptimizedList]);
+  }, [selectedRestoreImages]);
 
   const optimizeImage = useCallback(
     async (productId: number, image: ImageItem) => {
@@ -1504,12 +1492,92 @@ export default function DashboardPage() {
         ? "Optimize All Brands"
         : "Optimize All Products";
 
+  const productHasSelection = listType === "product" && bulkSelectedCount > 0;
+  const categoryHasSelection =
+    listType === "categories" && categoryBulkState.selectedCount > 0;
+  const selectedOptimizeCount = productHasSelection
+    ? selectedOptimizeImageCount
+    : categoryHasSelection
+      ? categoryBulkState.selectedOptimizeCount
+      : 0;
+  const optimizeButtonLabel =
+    selectedOptimizeCount > 0
+      ? `${optimizeAllLabel} (${selectedOptimizeCount})`
+      : optimizeAllLabel;
+  const isOptimizeActionPending = productHasSelection
+    ? bulkOptimizePending
+    : categoryHasSelection
+      ? categoryBulkState.isBulkOptimizing
+      : bulkOptimizeAllPending;
+
+  const handleOptimizeAction = () => {
+    if (productHasSelection) {
+      if (selectedOptimizeImageCount > 0) {
+        void bulkOptimizeSelected();
+        return;
+      }
+      setAllOptimizedAlertOpen(true);
+      return;
+    }
+    if (categoryHasSelection) {
+      if (categoryBulkState.selectedOptimizeCount > 0) {
+        categoryBulkActionsRef.current?.optimize();
+        return;
+      }
+      toast.message(
+        "Select images that are not optimized yet, or clear the selection to optimize all.",
+      );
+      return;
+    }
+    setOptimizeConfirmOpen(true);
+  };
+
   const restoreAllLabel =
     listType === "categories"
       ? "Restore All Categories"
       : listType === "brand"
         ? "Restore All Brands"
         : "Restore All Products";
+
+  const selectedRestoreCount = productHasSelection
+    ? selectedRestoreImageCount
+    : categoryHasSelection
+      ? categoryBulkState.selectedRestoreCount
+      : 0;
+  const restoreButtonLabel =
+    selectedRestoreCount > 0
+      ? `${restoreAllLabel} (${selectedRestoreCount})`
+      : restoreAllLabel;
+  const isRestoreActionPending = productHasSelection
+    ? bulkRestorePending
+    : categoryHasSelection
+      ? categoryBulkState.isBulkRestoring
+      : bulkRestoreAllPending;
+
+  const handleRestoreAction = () => {
+    if (productHasSelection) {
+      if (selectedRestoreImageCount > 0) {
+        void bulkRestoreSelected();
+        return;
+      }
+      toast.message(
+        "Select optimized images to restore, or clear the selection to restore all.",
+      );
+      return;
+    }
+    if (categoryHasSelection) {
+      if (categoryBulkState.selectedRestoreCount > 0) {
+        categoryBulkActionsRef.current?.restore();
+        return;
+      }
+      toast.message(
+        "Select optimized images to restore, or clear the selection to restore all.",
+      );
+      return;
+    }
+    setRestoreConfirmTarget("global");
+    setRestoreConfirmOpen(true);
+  };
 
   const handleStatsChange = useCallback(
     (
@@ -1661,98 +1729,31 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              onClick={() => setOptimizeConfirmOpen(true)}
-              disabled={bulkOptimizeAllPending}
+              onClick={handleOptimizeAction}
+              disabled={isOptimizeActionPending}
               className="btn-default disabled:bg-[#F0F0F0] disabled:text-[#8A8A8A] disabled:shadow-none"
             >
-              {bulkOptimizeAllPending ? (
+              {isOptimizeActionPending ? (
                 <ButtonLoader label="Optimizing…" />
               ) : (
-                optimizeAllLabel
+                optimizeButtonLabel
               )}
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setRestoreConfirmTarget("global");
-                setRestoreConfirmOpen(true);
-              }}
-              disabled={bulkRestoreAllPending}
+              onClick={handleRestoreAction}
+              disabled={isRestoreActionPending}
               className="btn-default"
             >
-              {bulkRestoreAllPending ? (
+              {isRestoreActionPending ? (
                 <ButtonLoader label="Restoring…" />
               ) : (
-                restoreAllLabel
+                restoreButtonLabel
               )}
             </button>
 
             <OptimizationSettingsDialog />
-
-            {listType === "product" && bulkSelectedCount > 0 ? (
-              <>
-                {bulkSelectedOptimizedCount > 0 ? (
-                  <button
-                    type="button"
-                    disabled={bulkRestorePending}
-                    onClick={() => void bulkRestoreSelected()}
-                    className="btn-default"
-                  >
-                    {bulkRestorePending ? (
-                      <ButtonLoader label="Restoring…" />
-                    ) : (
-                      `Restore (${bulkSelectedOptimizedCount})`
-                    )}
-                  </button>
-                ) : null}
-
-                <button
-                  type="button"
-                  disabled={bulkOptimizePending}
-                  onClick={() => void bulkOptimizeSelected()}
-                  className="custom-btn"
-                >
-                  {bulkOptimizePending ? (
-                    <ButtonLoader label="Optimizing…" />
-                  ) : (
-                    `Optimize (${bulkSelectedNotOptimizedCount > 0 ? bulkSelectedNotOptimizedCount : bulkSelectedCount})`
-                  )}
-                </button>
-              </>
-            ) : null}
-
-            {listType === "categories" && categoryBulkState.selectedCount > 0 ? (
-              <>
-                {categoryBulkState.selectedRestoreCount > 0 ? (
-                  <button
-                    type="button"
-                    disabled={categoryBulkState.isBulkRestoring}
-                    onClick={() => categoryBulkActionsRef.current?.restore()}
-                    className="btn-default"
-                  >
-                    {categoryBulkState.isBulkRestoring ? (
-                      <ButtonLoader label="Restoring…" />
-                    ) : (
-                      `Restore (${categoryBulkState.selectedRestoreCount})`
-                    )}
-                  </button>
-                ) : null}
-
-                <button
-                  type="button"
-                  disabled={categoryBulkState.isBulkOptimizing}
-                  onClick={() => categoryBulkActionsRef.current?.optimize()}
-                  className="custom-btn"
-                >
-                  {categoryBulkState.isBulkOptimizing ? (
-                    <ButtonLoader label="Optimizing…" />
-                  ) : (
-                    `Optimize (${categoryBulkState.selectedOptimizeCount > 0 ? categoryBulkState.selectedOptimizeCount : categoryBulkState.selectedCount})`
-                  )}
-                </button>
-              </>
-            ) : null}
           </div>
         </div>
 

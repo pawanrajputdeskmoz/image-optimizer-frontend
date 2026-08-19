@@ -122,8 +122,8 @@ export default function ImageComparePopup({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
-      <div className="relative w-full max-w-lg rounded-lg bg-white p-3 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3" onClick={close}>
+      <div className="relative w-full max-w-2xl rounded-lg bg-white p-3 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={close}
@@ -136,7 +136,7 @@ export default function ImageComparePopup({
         <h2 className="mb-2 pr-6 text-sm font-semibold">Original vs Optimized</h2>
 
         <div
-          className="image-compare-root relative h-[min(220px,38vh)] overflow-hidden rounded-md bg-gray-100"
+          className="image-compare-root relative h-[min(360px,55vh)] overflow-hidden rounded-md bg-gray-100"
           style={{ touchAction: "none" }}
         >
           {loadError ? (

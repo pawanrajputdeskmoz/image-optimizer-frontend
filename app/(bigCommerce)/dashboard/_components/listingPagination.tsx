@@ -83,7 +83,7 @@ export default function ListingPagination({
           }}
           onBlur={submitJump}
           disabled={controlsDisabled}
-          className="io-input w-12 !h-8 text-center"
+          className="io-input w-12 !h-8 !px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
           aria-label="Page number"
         />
         <span>

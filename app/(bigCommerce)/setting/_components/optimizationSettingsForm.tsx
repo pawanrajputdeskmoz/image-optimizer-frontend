@@ -67,7 +67,6 @@ export function useOptimizationSettings({
 
   const cruiseControlEnabled =
     !isFreePlan && autoOptimize && autoOptimizeCategory;
-  const formatConversionEnabled = outputFormat !== "original";
 
   const formatRadioOptions = useMemo(() => {
     const known = FORMAT_OPTIONS.some((o) => o.id === outputFormat);
@@ -282,16 +281,6 @@ export function useOptimizationSettings({
     }
   }
 
-  const setFormatConversionEnabled = (nextEnabled: boolean) => {
-    if (nextEnabled) {
-      if (outputFormat === "original") {
-        setOutputFormat("webp");
-      }
-    } else {
-      setOutputFormat("original");
-    }
-  };
-
   return {
     loadState,
     savePending,
@@ -301,8 +290,6 @@ export function useOptimizationSettings({
     activePreset,
     quality,
     setQuality,
-    formatConversionEnabled,
-    setFormatConversionEnabled,
     formatRadioOptions,
     outputFormat,
     setOutputFormat,
@@ -328,13 +315,11 @@ export type OptimizationSettingsState = ReturnType<
 
 type OptimizationSettingsFormProps = {
   settings: OptimizationSettingsState;
-  showActivityTable?: boolean;
   className?: string;
 };
 
 export function OptimizationSettingsForm({
   settings,
-  showActivityTable = false,
   className,
 }: OptimizationSettingsFormProps) {
   const {
@@ -342,8 +327,6 @@ export function OptimizationSettingsForm({
     activePreset,
     quality,
     setQuality,
-    formatConversionEnabled,
-    setFormatConversionEnabled,
     formatRadioOptions,
     outputFormat,
     setOutputFormat,
@@ -495,22 +478,9 @@ export function OptimizationSettingsForm({
 
             {/* Image Format Conversion */}
             <div className="space-y-3 border-t border-gray-100 pt-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Image Format Conversion
-                </h3>
-                <VcToggleSwitch
-                  enabled={formatConversionEnabled}
-                  onToggle={() =>
-                    setFormatConversionEnabled(!formatConversionEnabled)
-                  }
-                  label={
-                    formatConversionEnabled
-                      ? "Disable format conversion"
-                      : "Enable format conversion"
-                  }
-                />
-              </div>
+              <h3 className="text-sm font-semibold text-gray-900">
+                Image Format Conversion
+              </h3>
 
               <p className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
                 Convert To
@@ -519,8 +489,6 @@ export function OptimizationSettingsForm({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {formatRadioOptions.map((opt) => {
                   const selected = outputFormat === opt.id;
-                  const disabled =
-                    !formatConversionEnabled && opt.id !== "original";
 
                   return (
                     <label
@@ -528,7 +496,7 @@ export function OptimizationSettingsForm({
                       className={`flex cursor-pointer gap-3 rounded-xl border bg-white p-3.5 transition-colors ${selected
                           ? "border-[#5D5FEF] bg-[#FDFDFD]"
                           : "border-gray-200 hover:border-gray-300"
-                        } ${disabled ? "pointer-events-none opacity-50" : ""}`}
+                        }`}
                     >
                       <input
                         type="radio"
@@ -536,7 +504,6 @@ export function OptimizationSettingsForm({
                         value={opt.id}
                         checked={selected}
                         onChange={() => setOutputFormat(opt.id)}
-                        disabled={disabled}
                         className="mt-1 accent-[#303030]"
                       />
                       <span className="min-w-0 flex-1">
@@ -591,47 +558,6 @@ export function OptimizationSettingsForm({
           defaultTemplate="[name]"
           previewMode="alt"
         />
-      ) : null}
-
-      {showActivityTable ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-0! shadow-sm">
-          <table className="w-full text-xs md:text-[13px]">
-            <thead>
-              <tr className="border-b border-[#ebebeb] text-left text-[#616161]">
-                <th className="px-4 py-2 font-medium">Product Name</th>
-                <th className="font-medium">Images Optimized</th>
-                <th className="font-medium">Status</th>
-                <th className="font-medium">Compression</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ["Sports Jacket", "12", "success", "Today, 3:15 PM"],
-                ["Handbag Set", "8", "success", "Yesterday, 5:40 PM"],
-                ["Camera Lens", "15", "failed", "Apr 18, 2:20 PM"],
-              ].map((row, i) => (
-                <tr
-                  key={i}
-                  className="border-b border-[#ebebeb] last:border-none"
-                >
-                  <td className="px-4 py-2 text-[#303030]">{row[0]}</td>
-                  <td className="text-[#303030]">{row[1]}</td>
-                  <td>
-                    <span
-                      className={`rounded px-2 py-1 text-xs font-medium ${row[2] === "success"
-                          ? "bg-green-100 text-green-600"
-                          : "bg-red-100 text-red-600"
-                        }`}
-                    >
-                      {row[2]}
-                    </span>
-                  </td>
-                  <td className="text-[#303030]">{row[3]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       ) : null}
     </div>
   );

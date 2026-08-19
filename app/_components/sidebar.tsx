@@ -7,7 +7,6 @@ import Link from "next/link";
 import { type ComponentType } from "react";
 import {
   LayoutDashboard,
-  Settings,
   BadgeDollarSign,
   HelpCircle,
 } from "lucide-react";
@@ -75,18 +74,6 @@ export default function Sidebar({
               </Link>
             </li>
 
-            <li>
-              <Link
-                prefetch={false}
-                href="/setting"
-                className={segment == "setting" ? "active" : ""}
-              >
-                <div className="nav-icon">
-                  <SidebarIcon icon={Settings} />
-                </div>
-                <span className="nav-text">Setting</span>
-              </Link>
-            </li>
 
             <li className="nav-separator"></li>
 

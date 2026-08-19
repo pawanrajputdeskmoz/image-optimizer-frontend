@@ -18,7 +18,7 @@ export default function SettingsUI() {
         actions={<SettingsSaveActions settings={settings} />}
       />
 
-      <OptimizationSettingsForm settings={settings} showActivityTable />
+      <OptimizationSettingsForm settings={settings} />
     </div>
   );
 }
