@@ -1,6 +1,13 @@
 "use client";
 
-import { AlertTriangle, CheckCheck, FileImage, Sparkles, Zap } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCheck,
+  FileImage,
+  Settings,
+  Sparkles,
+  Zap,
+} from "lucide-react";
 
 import {
   Dialog,
@@ -16,6 +23,7 @@ type OptimizeConfirmModalProps = {
   isPending?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  onOpenSettings?: () => void;
 };
 
 const OPTIMIZE_DETAILS = [
@@ -41,6 +49,7 @@ export default function OptimizeConfirmModal({
   isPending = false,
   onConfirm,
   onCancel,
+  onOpenSettings,
 }: OptimizeConfirmModalProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
@@ -61,10 +70,24 @@ export default function OptimizeConfirmModal({
               </span>
             </div>
 
-            <div className="min-w-0 text-left">
-              <DialogTitle className="text-base font-bold text-[#303030]">
-                Optimize All Images
-              </DialogTitle>
+            <div className="min-w-0 flex-1 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <DialogTitle className="text-base font-bold text-[#303030]">
+                  Optimize All Images
+                </DialogTitle>
+                {onOpenSettings ? (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-[#303030] bg-[#303030] px-2.5 text-[11px] font-semibold text-white shadow-[0_1px_2px_rgba(0,0,0,0.08)] transition-colors hover:bg-[#1f1f1f]"
+                    aria-label="Open optimization settings"
+                    title="Review settings before optimizing"
+                  >
+                    <Settings className="size-3.5" strokeWidth={2.2} />
+                    Settings
+                  </button>
+                ) : null}
+              </div>
               <DialogDescription className="text-xs font-normal text-[#616161]">
                 Run optimization across all pending images using your current
                 settings.

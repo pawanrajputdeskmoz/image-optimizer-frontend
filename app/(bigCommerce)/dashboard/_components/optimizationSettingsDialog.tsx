@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Settings } from "lucide-react";
 
 import {
   Dialog,
@@ -19,19 +20,38 @@ import {
 
 type OptimizationSettingsDialogProps = {
   triggerClassName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
 };
 
 export default function OptimizationSettingsDialog({
   triggerClassName = "btn-default",
+  open: openProp,
+  onOpenChange,
+  showTrigger = true,
 }: OptimizationSettingsDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
+
+  const setOpen = (next: boolean) => {
+    if (!isControlled) {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
+  };
+
   const settings = useOptimizationSettings({ enabled: open });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={triggerClassName}>
-        Optimization Setting
-      </DialogTrigger>
+      {showTrigger ? (
+        <DialogTrigger className={triggerClassName}>
+          <Settings className="size-3.5 shrink-0" aria-hidden />
+          Optimization Setting
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="flex max-h-[96vh] w-full max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <DialogHeader className="border-b border-gray-100 px-5 py-4 gap-0">
           <DialogTitle className="text-base font-bold text-gray-900">

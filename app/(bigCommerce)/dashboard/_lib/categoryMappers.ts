@@ -187,7 +187,7 @@ export function mapCategoryToContextualImage(category: Category): ContextualImag
     sourceKey: `category::${category.id}`,
     sourceId: String(category.id),
     sourceName: category.name,
-    context: "Category image",
+    context: "",
     url: displayUrl,
     originalUrl: category.imageUrl,
     optimizedUrl: category.optimizedUrl,

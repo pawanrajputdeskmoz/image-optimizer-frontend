@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { isApiError, isApiFailure } from "../_lib/apiUtils";
 import {
@@ -79,8 +80,6 @@ export default function CategoryImageListing({
   const [perPage, setPerPage] = useState<number>(50);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [previewCategory, setPreviewCategory] = useState<Category | null>(
     null,
   );
@@ -99,15 +98,13 @@ export default function CategoryImageListing({
       const silent = options?.silent === true;
       if (!silent) {
         setIsLoading(true);
-        setError(null);
-        setMessage(null);
       }
 
       try {
         const storeHash = readStoreHash();
         if (!storeHash) {
           if (!silent) {
-            setError("Store hash not found.");
+            toast.error("Store hash not found.");
           }
           return;
         }
@@ -120,22 +117,19 @@ export default function CategoryImageListing({
 
         if (isApiError(response)) {
           if (!silent) {
-            setError("Failed to load category images.");
+            toast.error("Failed to load category images.");
           }
           return;
         }
 
         if (isApiFailure(response)) {
           if (!silent) {
-            setError(response.message || "Failed to load category images.");
+            toast.error(response.message || "Failed to load category images.");
           }
           return;
         }
 
         setCategories(mapApiCategories(response.data));
-        if (!silent) {
-          setMessage(response.message ?? null);
-        }
         hasLoadedRef.current = true;
 
         const serverTotalPages = response.pagination?.total_pages;
@@ -146,7 +140,7 @@ export default function CategoryImageListing({
         );
       } catch {
         if (!silent) {
-          setError("Something went wrong while loading category images.");
+          toast.error("Something went wrong while loading category images.");
         }
       } finally {
         if (!silent) {
@@ -188,23 +182,22 @@ export default function CategoryImageListing({
     async (image: ContextualImage) => {
       const category = findCategoryByContextualImage(categories, image);
       if (!category) {
-        setError("Category not found.");
+        toast.error("Category not found.");
         return;
       }
 
       setOptimizingKeys((prev) => ({ ...prev, [image.key]: true }));
-      setError(null);
 
       try {
         const response = await optimizeCategoryImage(category);
 
         if (isApiError(response)) {
-          setError("Failed to optimize category image.");
+          toast.error("Failed to optimize category image.");
           return;
         }
 
         if (isApiFailure(response)) {
-          setError(response.message || "Failed to optimize category image.");
+          toast.error(response.message || "Failed to optimize category image.");
           return;
         }
 
@@ -217,7 +210,7 @@ export default function CategoryImageListing({
           Boolean(result?.optimized_url);
 
         if (response.success !== true || !result || !isOptimized) {
-          setError(response.message || "Failed to optimize category image.");
+          toast.error(response.message || "Failed to optimize category image.");
           return;
         }
 
@@ -228,9 +221,11 @@ export default function CategoryImageListing({
               : item,
           ),
         );
-        setMessage(response.message ?? "Category image optimized successfully.");
+        toast.success(
+          response.message ?? "Category image optimized successfully.",
+        );
       } catch (err) {
-        setError(
+        toast.error(
           err instanceof Error
             ? err.message
             : "Something went wrong while optimizing the category image.",
@@ -254,28 +249,27 @@ export default function CategoryImageListing({
     async (image: ContextualImage) => {
       const category = findCategoryByContextualImage(categories, image);
       if (!category) {
-        setError("Category not found.");
+        toast.error("Category not found.");
         return;
       }
 
       setRestoringKeys((prev) => ({ ...prev, [image.key]: true }));
-      setError(null);
 
       try {
         const response = await restoreCategoryImage(category);
 
         if (isApiError(response)) {
-          setError("Failed to restore category image.");
+          toast.error("Failed to restore category image.");
           return;
         }
 
         if (isApiFailure(response)) {
-          setError(response.message || "Failed to restore category image.");
+          toast.error(response.message || "Failed to restore category image.");
           return;
         }
 
         if (response.success !== true) {
-          setError(response.message || "Failed to restore category image.");
+          toast.error(response.message || "Failed to restore category image.");
           return;
         }
 
@@ -305,9 +299,11 @@ export default function CategoryImageListing({
               : item,
           ),
         );
-        setMessage(response.message ?? "Category image restored successfully.");
+        toast.success(
+          response.message ?? "Category image restored successfully.",
+        );
       } catch (err) {
-        setError(
+        toast.error(
           err instanceof Error
             ? err.message
             : "Something went wrong while restoring the category image.",
@@ -418,32 +414,31 @@ export default function CategoryImageListing({
       }));
 
     if (items.length === 0) {
-      setError("No eligible categories selected for optimization.");
+      toast.error("No eligible categories selected for optimization.");
       return;
     }
 
     setIsBulkOptimizing(true);
-    setError(null);
 
     try {
       const response = await bulkOptimizeCategoryImages(items);
 
       if (isApiError(response)) {
-        setError("Bulk optimization failed.");
+        toast.error("Bulk optimization failed.");
         return;
       }
 
       if (isApiFailure(response)) {
-        setError(response.message || "Bulk optimization failed.");
+        toast.error(response.message || "Bulk optimization failed.");
         return;
       }
 
       if (response.success !== true) {
-        setError(response.message || "Bulk optimization failed.");
+        toast.error(response.message || "Bulk optimization failed.");
         return;
       }
 
-      setMessage(
+      toast.success(
         response.message ??
           `${items.length} categor${items.length === 1 ? "y" : "ies"} queued for optimization.`,
       );
@@ -453,7 +448,7 @@ export default function CategoryImageListing({
       // Reload the page to reflect updated statuses from the server
       void loadCategories(currentPage, perPage, { silent: true });
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Something went wrong during bulk optimization.",
@@ -480,33 +475,32 @@ export default function CategoryImageListing({
       }));
 
     if (items.length === 0) {
-      setError("No optimized categories selected for restore.");
+      toast.error("No optimized categories selected for restore.");
       return;
     }
 
     setIsBulkRestoring(true);
-    setError(null);
 
     try {
       const response = await bulkRestoreCategoryImages(items);
 
       if (isApiError(response)) {
-        setError("Bulk restore failed.");
+        toast.error("Bulk restore failed.");
         return;
       }
 
       if (isApiFailure(response)) {
-        setError(response.message || "Bulk restore failed.");
+        toast.error(response.message || "Bulk restore failed.");
         return;
       }
 
       if (response.success !== true) {
-        setError(response.message || "Bulk restore failed.");
+        toast.error(response.message || "Bulk restore failed.");
         return;
       }
 
       const queued = response.data?.queued_categories ?? items.length;
-      setMessage(
+      toast.success(
         response.message ??
           `${queued} categor${queued === 1 ? "y" : "ies"} queued for restore.`,
       );
@@ -514,7 +508,7 @@ export default function CategoryImageListing({
       onJobQueued?.();
       void loadCategories(currentPage, perPage, { silent: true });
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Something went wrong during bulk restore.",
@@ -579,16 +573,6 @@ export default function CategoryImageListing({
 
   return (
     <div className="space-y-3">
-      {error && !isLoading ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-
-      {message && !error && !isLoading ? (
-        <p className="text-sm text-gray-600">{message}</p>
-      ) : null}
-
       <div className="rounded-xl border bg-white">
         <div className="h-[520px] overflow-y-auto p-3">
           {isLoading ? (

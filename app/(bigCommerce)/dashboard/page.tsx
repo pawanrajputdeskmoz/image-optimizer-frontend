@@ -8,9 +8,12 @@ import {
   ArrowUpDown,
   Eye,
   Loader2,
+  RotateCcw,
   RotateCw,
   Search,
+  Settings,
   Star,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -216,6 +219,8 @@ export default function DashboardPage() {
     "global" | { product: (typeof products)[number] } | null
   >(null);
   const [optimizeConfirmOpen, setOptimizeConfirmOpen] = useState(false);
+  const [optimizationSettingsOpen, setOptimizationSettingsOpen] =
+    useState(false);
   const silentListingRefreshRef = useRef(false);
   const productsLoadIdRef = useRef(0);
   const wasActiveJobRef = useRef(false);
@@ -1502,7 +1507,7 @@ export default function DashboardPage() {
       : 0;
   const optimizeButtonLabel =
     selectedOptimizeCount > 0
-      ? `${optimizeAllLabel} (${selectedOptimizeCount})`
+      ? `Optimize All Images (${selectedOptimizeCount})`
       : optimizeAllLabel;
   const isOptimizeActionPending = productHasSelection
     ? bulkOptimizePending
@@ -1546,7 +1551,7 @@ export default function DashboardPage() {
       : 0;
   const restoreButtonLabel =
     selectedRestoreCount > 0
-      ? `${restoreAllLabel} (${selectedRestoreCount})`
+      ? `Restore All Images (${selectedRestoreCount})`
       : restoreAllLabel;
   const isRestoreActionPending = productHasSelection
     ? bulkRestorePending
@@ -1736,7 +1741,10 @@ export default function DashboardPage() {
               {isOptimizeActionPending ? (
                 <ButtonLoader label="Optimizing…" />
               ) : (
-                optimizeButtonLabel
+                <>
+                  <Zap className="size-3.5 shrink-0" aria-hidden />
+                  {optimizeButtonLabel}
+                </>
               )}
             </button>
 
@@ -1749,11 +1757,21 @@ export default function DashboardPage() {
               {isRestoreActionPending ? (
                 <ButtonLoader label="Restoring…" />
               ) : (
-                restoreButtonLabel
+                <>
+                  <RotateCcw className="size-3.5 shrink-0" aria-hidden />
+                  {restoreButtonLabel}
+                </>
               )}
             </button>
 
-            <OptimizationSettingsDialog />
+            <button
+              type="button"
+              onClick={() => setOptimizationSettingsOpen(true)}
+              className="btn-default"
+            >
+              <Settings className="size-3.5 shrink-0" aria-hidden />
+              Optimization Setting
+            </button>
           </div>
         </div>
 
@@ -2014,7 +2032,7 @@ export default function DashboardPage() {
                           aria-label={`Select ${product.name}`}
                         />
 
-                        <div className="relative shrink-0">
+                        <div className="shrink-0">
                           <Image
                             src={listingImage?.url || PLACEHOLDER_IMAGE}
                             alt={product.name}
@@ -2023,15 +2041,6 @@ export default function DashboardPage() {
                             unoptimized
                             className="size-10 rounded object-cover"
                           />
-                          {listingImage?.isThumbnail ? (
-                            <span
-                              className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-amber-400 text-white shadow-sm"
-                              title="Product thumbnail"
-                              aria-label="Product thumbnail"
-                            >
-                              <Star className="size-2.5 fill-current" />
-                            </span>
-                          ) : null}
                         </div>
 
                         <div className="overflow-hidden">
@@ -2491,10 +2500,17 @@ export default function DashboardPage() {
         open={optimizeConfirmOpen}
         isPending={bulkOptimizeAllPending}
         onCancel={() => setOptimizeConfirmOpen(false)}
+        onOpenSettings={() => setOptimizationSettingsOpen(true)}
         onConfirm={() => {
           setOptimizeConfirmOpen(false);
           void bulkOptimizeAll();
         }}
+      />
+
+      <OptimizationSettingsDialog
+        open={optimizationSettingsOpen}
+        onOpenChange={setOptimizationSettingsOpen}
+        showTrigger={false}
       />
     </div>
   );
