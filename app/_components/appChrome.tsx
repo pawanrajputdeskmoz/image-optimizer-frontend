@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/app/_components/sidebar";
+import IntercomBoot from "@/app/_components/intercomBoot";
 import ReduxProvider from "@/app/store/provider";
 
 export default function AppChrome({ children }: { children: ReactNode }) {
@@ -15,6 +16,7 @@ export default function AppChrome({ children }: { children: ReactNode }) {
 
   return (
     <section className="frame-area bg-[#F1F1F1]">
+      <IntercomBoot />
       <div className="flex">
         <Sidebar />
         <div className="frame-main flex-1">

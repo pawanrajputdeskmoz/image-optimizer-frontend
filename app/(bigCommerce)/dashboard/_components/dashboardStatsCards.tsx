@@ -128,7 +128,10 @@ export default function DashboardStatsCards({
     if (mode === "initial") setInitialLoading(true);
     if (mode === "refresh") setRefreshing(true);
 
-    const res = await fetchDashboardStats();
+    // Sync Intercom on every fresh dashboard visit (not on poll/refresh).
+    const res = await fetchDashboardStats({
+      syncIntercom: mode === "initial",
+    });
     if (!isApiFailure(res) && res.data) {
       setStats(res.data);
       setActiveJob(res.data.active_job === true);

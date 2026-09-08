@@ -299,9 +299,10 @@ export async function fetchCategoryPreviewImageData(params: {
   ) as Promise<CategoryPreviewImageApiResponse>;
 }
 
-export async function fetchDashboardStats() {
+export async function fetchDashboardStats(options?: { syncIntercom?: boolean }) {
   return ApiCall("settings/dashboard-stats", {}, {
     method: "GET",
+    query: options?.syncIntercom ? { sync_intercom: "1" } : undefined,
   }) as Promise<ClientDashboardStatsResponse>;
 }
 

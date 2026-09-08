@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import Loading from "../_components/loading";
 
 import { InstallApi } from "@/app/_api/apiCall";
@@ -13,40 +14,79 @@ function InstallContent() {
   const code = searchParams.get("code");
   const context = searchParams.get("context");
   const scope = searchParams.get("scope");
-  const singed_payload = searchParams.get("signed_payload_jwt");
+  const signedPayload = searchParams.get("signed_payload_jwt");
 
   const [loading, setLoading] = useState(true);
   const [validUser, setValidUser] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-    console.log("running")
 
-    InstallApi("store/load-application", { code, context, scope, signed_payload_jwt: singed_payload })
+    InstallApi("store/load-application", {
+      code,
+      context,
+      scope,
+      signed_payload_jwt: signedPayload,
+    })
       .then((data: InstallResponse) => {
         if (!isMounted) return;
 
-        if (data?.success == false) {
-          console.log("Install failed:", data.error);
+        if (data?.success !== true) {
+          toast.error(
+            data?.message ||
+              "We could not finish setup. Please try installing again."
+          );
           setValidUser(false);
           return;
         }
 
-        const isValid = data?.success == true;
-        setValidUser(isValid);
+        const result = data.data;
+        const userId = result?.user_id?.trim() || "";
+        const userHash = result?.user_hash?.trim() || "";
 
-        if (isValid) {
-          const result = data?.data;
-          localStorage.setItem("api-token", result?.api_token ?? "");
-          localStorage.setItem("shop", result?.storeHash ?? "");
-          localStorage.setItem("manage_service", result?.manage_services ?? "");
-          localStorage.setItem("user_id", result?.user_id ?? "");
-          localStorage.setItem(
-            "channel",
-            JSON.stringify(result?.channel_list?.[0] ?? {})
+        if (!userId) {
+          toast.error(
+            "Something went wrong during setup. Please try installing again."
           );
-          router.replace("/dashboard");
+          setValidUser(false);
+          return;
         }
+
+        if (!userHash) {
+          toast.error(
+            "Chat support is temporarily unavailable. You can continue using the app."
+          );
+        }
+
+        localStorage.setItem("api-token", result?.api_token ?? "");
+        localStorage.setItem("shop", result?.storeHash ?? "");
+        localStorage.setItem("manage_service", result?.manage_services ?? "");
+        localStorage.setItem("user_id", userId);
+
+        if (userHash) {
+          localStorage.setItem("user_hash", userHash);
+        } else {
+          localStorage.removeItem("user_hash");
+        }
+
+        localStorage.removeItem("intercom_user_id");
+        localStorage.removeItem("intercom_email");
+        localStorage.removeItem("intercom_name");
+
+        localStorage.setItem(
+          "channel",
+          JSON.stringify(result?.channel_list?.[0] ?? {})
+        );
+
+        setValidUser(true);
+        router.replace("/dashboard");
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        toast.error(
+          "We could not reach the server. Please check your connection and try again."
+        );
+        setValidUser(false);
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -55,7 +95,7 @@ function InstallContent() {
     return () => {
       isMounted = false;
     };
-  }, [code, context, router, scope, singed_payload]);
+  }, [code, context, router, scope, signedPayload]);
 
   if (loading || validUser) return <Loading />;
 
