@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import AppChrome from "./_components/appChrome";
 import AppToaster from "./_components/app-toaster";
+import LogRocketBoot from "./_components/logRocketBoot";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <LogRocketBoot />
         <AppToaster />
         <AppChrome>{children}</AppChrome>
       </body>
