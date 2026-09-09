@@ -60,6 +60,7 @@ function InstallContent() {
 
         localStorage.setItem("api-token", result?.api_token ?? "");
         localStorage.setItem("shop", result?.storeHash ?? "");
+        localStorage.setItem("email", result?.email?.trim() || "");
         localStorage.setItem("manage_service", result?.manage_services ?? "");
         localStorage.setItem("user_id", userId);
 
