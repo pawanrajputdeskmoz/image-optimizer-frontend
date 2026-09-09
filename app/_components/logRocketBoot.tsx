@@ -12,6 +12,8 @@ const BLOCKED_IPS: string[] = [
 ];
 
 const IDENTIFY_POLL_MS = 500;
+/** Keep polling until shop+email exist, or this timeout elapses */
+const IDENTIFY_MAX_WAIT_MS = 15000;
 
 /**
  * Starts LogRocket session recording for the whole app.
@@ -38,14 +40,20 @@ export default function LogRocketBoot() {
         // Start session recording
         LogRocket.init(APP_ID);
 
-        // Wait until load/install saves shop (+ email) in localStorage
+        const startedAt = Date.now();
+
+        // Wait until install/load writes shop (+ prefer email) into localStorage
         identifyInterval = window.setInterval(() => {
           if (cancelled) return;
 
           const shop = localStorage.getItem("shop")?.trim() || "";
-          if (!shop) return;
-
           const email = localStorage.getItem("email")?.trim() || "";
+          const waitedLongEnough =
+            Date.now() - startedAt >= IDENTIFY_MAX_WAIT_MS;
+
+          // Need shop at minimum; wait for email unless we hit the timeout
+          if (!shop) return;
+          if (!email && !waitedLongEnough) return;
 
           LogRocket.identify(shop, {
             ...(email ? { email } : {}),

@@ -14,7 +14,7 @@ export interface InstallResponse {
     /** Intercom Identity Verification HMAC of user_id */
     user_hash?: string | null;
     channel_list?: Array<{ channel_id?: number }>;
-    user?: unknown;
-    owner?: unknown;
+    user?: { id?: number; email?: string } | null;
+    owner?: { id?: number; email?: string } | null;
   };
 }
