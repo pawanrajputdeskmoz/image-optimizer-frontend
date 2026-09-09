@@ -9,7 +9,7 @@ export interface InstallResponse {
     storeHash?: string;
     manage_services?: string;
     email?: string | null;
-    /** DB user id (also Intercom Messenger user_id) */
+    /** Intercom Messenger user_id (`io_{storeHash}`) */
     user_id?: string;
     /** Intercom Identity Verification HMAC of user_id */
     user_hash?: string | null;

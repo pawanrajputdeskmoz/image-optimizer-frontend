@@ -17,7 +17,7 @@ declare global {
 }
 
 /**
- * Boots Intercom with localStorage user_id (DB id) + user_hash (HMAC).
+ * Boots Intercom with localStorage user_id (`io_{storeHash}`) + user_hash (HMAC).
  */
 export default function IntercomBoot() {
   useEffect(() => {
