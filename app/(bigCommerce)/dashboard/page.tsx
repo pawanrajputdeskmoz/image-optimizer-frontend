@@ -27,7 +27,6 @@ import {
 import AltTextField from "./_components/altTextField";
 import RestoreConfirmModal from "./_components/restoreConfirmModal";
 import OptimizeConfirmModal from "./_components/optimizeConfirmModal";
-import BrandImageListing from "./_components/brandImageListing";
 import CategoryImageListing, {
   type CategoryBulkActionsState,
 } from "./_components/categoryImageListing";
@@ -39,11 +38,9 @@ import ImageOptimizerAppHeader from "@/app/_components/imageOptimizerAppHeader";
 import { isApiError, isApiFailure, notifyApiBusinessFailure } from "./_lib/apiUtils";
 import { buildBulkOptimizeItem, bulkSelectionKey } from "./_lib/bulkSelection";
 import {
-  bulkOptimizeAllBrands,
   bulkOptimizeAllCategories,
   bulkOptimizeAllImages,
   bulkOptimizeImages,
-  bulkRestoreAllBrands,
   bulkRestoreAllCategories,
   bulkRestoreAllImages,
   bulkRestoreImages,
@@ -75,6 +72,37 @@ const LIST_TYPE_OPTIONS: { id: ImageListType; label: string }[] = [
   { id: "product", label: "Products" },
   { id: "categories", label: "Categories" },
 ];
+
+const LIST_TYPE_STORAGE_KEY = "dashboard-list-type";
+
+function readStoredListType(): ImageListType {
+  if (typeof window === "undefined") {
+    return "product";
+  }
+
+  try {
+    const stored = sessionStorage.getItem(LIST_TYPE_STORAGE_KEY);
+    if (stored === "product" || stored === "categories") {
+      return stored;
+    }
+  } catch {
+    // ignore storage errors
+  }
+
+  return "product";
+}
+
+function writeStoredListType(nextType: ImageListType) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    sessionStorage.setItem(LIST_TYPE_STORAGE_KEY, nextType);
+  } catch {
+    // ignore storage errors
+  }
+}
 
 type PreviewTarget = {
   productId: number;
@@ -148,7 +176,7 @@ export default function DashboardPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [listType, setListType] = useState<ImageListType>("product");
+  const [listType, setListType] = useState<ImageListType>(readStoredListType);
   const [openProductAccordion, setOpenProductAccordion] = useState<string[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productsError, setProductsError] = useState<string | null>(null);
@@ -232,7 +260,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const onChannelChanged = () => {
-      setListType("product");
       setCurrentPage(1);
       setBulkSelected({});
       setSelectedImages({});
@@ -551,9 +578,7 @@ export default function DashboardPage() {
 
       if (isApiError(response) || isApiFailure(response)) {
         clearSelectedOptimizeLoaders();
-        if (isApiFailure(response)) {
-          toast.error(response.message || "Bulk optimization failed");
-        }
+        notifyApiBusinessFailure(response, "Bulk optimization failed");
         return;
       }
 
@@ -643,25 +668,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const response = await bulkOptimizeAllBrands();
-      if (notifyApiBusinessFailure(response, "Brand image optimization failed")) {
-        setBulkOptimizeAllPending(false);
-        return;
-      }
-      const queued = response?.data?.queued;
-      const skipped = response?.data?.skipped ?? 0;
-      setProductsRefreshNonce((n) => n + 1);
-      toast.success(
-        response.message ||
-        (typeof queued === "number"
-          ? skipped > 0
-            ? `${queued} brand image(s) queued (${skipped} skipped)`
-            : `${queued} brand image(s) queued for optimization`
-          : "All brand images queued for optimization"),
-      );
-      if (typeof queued === "number" && queued <= 0) {
-        setBulkOptimizeAllPending(false);
-      }
+      setBulkOptimizeAllPending(false);
     } catch {
       setBulkOptimizeAllPending(false);
     }
@@ -678,9 +685,7 @@ export default function DashboardPage() {
 
         if (isApiError(response) || isApiFailure(response)) {
           clearRestoreActionLoaders();
-          if (isApiFailure(response)) {
-            toast.error(response.message || "Product image restore failed");
-          }
+          notifyApiBusinessFailure(response, "Product image restore failed");
           return;
         }
 
@@ -714,9 +719,7 @@ export default function DashboardPage() {
 
         if (isApiError(response) || isApiFailure(response)) {
           clearRestoreActionLoaders();
-          if (isApiFailure(response)) {
-            toast.error(response.message || "Category image restore failed");
-          }
+          notifyApiBusinessFailure(response, "Category image restore failed");
           return;
         }
 
@@ -741,34 +744,7 @@ export default function DashboardPage() {
         return;
       }
 
-      const response = await bulkRestoreAllBrands();
-
-      if (isApiError(response) || isApiFailure(response)) {
-        clearRestoreActionLoaders();
-        if (isApiFailure(response)) {
-          toast.error(response.message || "Brand image restore failed");
-        }
-        return;
-      }
-
-      const queued = response?.data?.queued;
-      const skipped = response?.data?.skipped ?? 0;
-      setProductsRefreshNonce((n) => n + 1);
-      if (typeof queued === "number" && queued <= 0) {
-        clearRestoreActionLoaders();
-        toast.message(
-          response.message || "No optimized brand images available to restore",
-        );
-        return;
-      }
-      toast.success(
-        response.message ||
-        (typeof queued === "number"
-          ? skipped > 0
-            ? `${queued} brand image(s) queued for restore (${skipped} skipped)`
-            : `${queued} brand image(s) queued for restore`
-          : "All brand images queued for restore"),
-      );
+      clearRestoreActionLoaders();
     } catch {
       clearRestoreActionLoaders();
     }
@@ -831,9 +807,7 @@ export default function DashboardPage() {
 
       if (isApiError(response) || isApiFailure(response)) {
         clearSelectedRestoreLoaders();
-        if (isApiFailure(response)) {
-          toast.error(response.message || "Bulk restore failed");
-        }
+        notifyApiBusinessFailure(response, "Bulk restore failed");
         return;
       }
 
@@ -1136,9 +1110,10 @@ export default function DashboardPage() {
             return next;
           });
           setOptimizingKeys((prev) => clearPayloadKeys(prev, payload));
-          if (isApiFailure(response)) {
-            toast.error(response.message || "Failed to optimize product images");
-          }
+          notifyApiBusinessFailure(
+            response,
+            "Failed to optimize product images",
+          );
           return;
         }
         toast.success(response.message || "Product images queued for optimization");
@@ -1190,9 +1165,10 @@ export default function DashboardPage() {
             return next;
           });
           setRestoringKeys((prev) => clearPayloadKeys(prev, payload));
-          if (isApiFailure(response)) {
-            toast.error(response.message || "Failed to restore product images");
-          }
+          notifyApiBusinessFailure(
+            response,
+            "Failed to restore product images",
+          );
           return;
         }
         toast.success(response.message || "Product images queued for restore");
@@ -1456,6 +1432,7 @@ export default function DashboardPage() {
       return;
     }
     setListType(nextType);
+    writeStoredListType(nextType);
     setCurrentPage(1);
     setBulkSelected({});
     setSelectedImages({});
@@ -1493,9 +1470,7 @@ export default function DashboardPage() {
   const optimizeAllLabel =
     listType === "categories"
       ? "Optimize All Categories"
-      : listType === "brand"
-        ? "Optimize All Brands"
-        : "Optimize All Products";
+      : "Optimize All Products";
 
   const productHasSelection = listType === "product" && bulkSelectedCount > 0;
   const categoryHasSelection =
@@ -1540,9 +1515,7 @@ export default function DashboardPage() {
   const restoreAllLabel =
     listType === "categories"
       ? "Restore All Categories"
-      : listType === "brand"
-        ? "Restore All Brands"
-        : "Restore All Products";
+      : "Restore All Products";
 
   const selectedRestoreCount = productHasSelection
     ? selectedRestoreImageCount
@@ -1594,12 +1567,10 @@ export default function DashboardPage() {
         active_bulk_jobs?: {
           product?: boolean;
           category?: boolean;
-          brand?: boolean;
         };
         active_bulk_restores?: {
           product?: boolean;
           category?: boolean;
-          brand?: boolean;
         };
       } | null
     ) => {
@@ -1620,7 +1591,7 @@ export default function DashboardPage() {
       const restores = stats.active_bulk_restores;
       const jobs = stats.active_bulk_jobs;
       const bulkRestoreActive = Boolean(
-        restores?.product || restores?.category || restores?.brand
+        restores?.product || restores?.category
       );
       const categoryJobActive = Boolean(
         jobs?.category || restores?.category
@@ -1924,15 +1895,6 @@ export default function DashboardPage() {
             onBulkActionsStateChange={setCategoryBulkState}
             bulkActionsRef={categoryBulkActionsRef}
             onJobQueued={() => setProductsRefreshNonce((n) => n + 1)}
-          />
-        ) : null}
-
-        {listType === "brand" ? (
-          <BrandImageListing
-            refreshNonce={listingRefreshKey}
-            headerSelectAllChecked={contextualHeaderSelectAllChecked}
-            headerSelectAllSignal={contextualHeaderSelectAllSignal}
-            onHeaderSelectAllStateChange={handleContextualHeaderSelectAllStateChange}
           />
         ) : null}
 

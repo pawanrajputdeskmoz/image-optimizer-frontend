@@ -27,6 +27,9 @@ function InstallContent() {
       context,
       scope,
       signed_payload_jwt: signedPayload,
+      // Full browser URL including signed_payload / signed_payload_jwt query.
+      signed_payload_url:
+        typeof window !== "undefined" ? window.location.href : null,
     })
       .then((data: InstallResponse) => {
         if (!isMounted) return;

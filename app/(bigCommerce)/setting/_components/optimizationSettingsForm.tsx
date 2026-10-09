@@ -5,10 +5,6 @@ import { Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApiCall } from "@/app/_api/apiCall";
-import {
-  CHANNEL_CHANGED_EVENT,
-  readChannelId,
-} from "@/app/_lib/channelStorage";
 import { isApiError, isApiFailure } from "../../dashboard/_lib/apiUtils";
 import { fetchDashboardStats } from "../../dashboard/_lib/imageOptimizerApi";
 import TemplateBox from "./templateBox";
@@ -49,7 +45,6 @@ export function useOptimizationSettings({
   const [baseline, setBaseline] = useState<SettingsRow | null>(null);
   const [isFreePlan, setIsFreePlan] = useState(false);
 
-  const [channelId, setChannelId] = useState<number>(() => readChannelId());
   const [optimizeImageEnabled, setOptimizeImageEnabled] = useState(true);
   const [isFilenameTemplateEnabled, setIsFilenameTemplateEnabled] =
     useState(true);
@@ -87,7 +82,6 @@ export function useOptimizationSettings({
     const autoCategory = freePlan
       ? false
       : row.auto_optimize_new_category_images;
-    setChannelId(row.channel_id);
     setOptimizeImageEnabled(row.optimize_image_enabled);
     setIsFilenameTemplateEnabled(row.is_filename_template_enabled);
     setFilenameTemplate(row.filename_template);
@@ -107,7 +101,6 @@ export function useOptimizationSettings({
   const hasUnsavedChanges = useMemo(() => {
     if (!baseline) return false;
     return (
-      baseline.channel_id !== channelId ||
       baseline.optimize_image_enabled !== optimizeImageEnabled ||
       baseline.is_filename_template_enabled !== isFilenameTemplateEnabled ||
       baseline.filename_template !== filenameTemplate ||
@@ -120,7 +113,6 @@ export function useOptimizationSettings({
     );
   }, [
     baseline,
-    channelId,
     optimizeImageEnabled,
     isFilenameTemplateEnabled,
     filenameTemplate,
@@ -134,8 +126,6 @@ export function useOptimizationSettings({
 
   async function load() {
     setLoadState("loading");
-    const cid = readChannelId();
-    setChannelId(cid);
 
     const [data, statsRes] = await Promise.all([
       ApiCall("settings", {}, { method: "GET" }),
@@ -150,13 +140,13 @@ export function useOptimizationSettings({
 
     if (isApiError(data)) {
       setLoadState("error");
-      pushRow(applyDefaults(cid), freePlan);
+      pushRow(applyDefaults(), freePlan);
       return;
     }
     const row = parseSettings(data);
     if (!row) {
       setLoadState("error");
-      pushRow(applyDefaults(cid), freePlan);
+      pushRow(applyDefaults(), freePlan);
       return;
     }
     pushRow(row, freePlan);
@@ -166,20 +156,6 @@ export function useOptimizationSettings({
   useEffect(() => {
     if (!enabled) return;
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled]);
-
-  useEffect(() => {
-    if (!enabled) return;
-
-    const onChannelChanged = () => {
-      void load();
-    };
-
-    window.addEventListener(CHANNEL_CHANGED_EVENT, onChannelChanged);
-    return () => {
-      window.removeEventListener(CHANNEL_CHANGED_EVENT, onChannelChanged);
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
@@ -217,7 +193,6 @@ export function useOptimizationSettings({
       const autoProduct = isFreePlan ? false : autoOptimize;
       const autoCategory = isFreePlan ? false : autoOptimizeCategory;
       const payload: SettingsRow = {
-        channel_id: readChannelId(),
         optimization_mode: optimizeImageEnabled
           ? isAltTextTemplateEnabled
             ? "optimize_and_alt"

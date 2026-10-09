@@ -1,21 +1,10 @@
 import { ApiCall } from "@/app/_api/apiCall";
 import type { ImageActionPayload, ImageItem } from "../types";
 import { buildImageActionPayload } from "./bulkSelection";
-import { buildBrandOptimizePayload } from "./brandOptimize";
 import { buildCategoryOptimizePayload } from "./categoryOptimize";
 import type {
-  Brand,
-  BrandBulkOptimizeItem,
-  BrandBulkOptimizeResponse,
-  BrandBulkRestoreResponse,
-  BrandOptimizeResponse,
-  BrandPreviewImageApiResponse,
-  BrandRestoreResponse,
-  BrandsApiResponse,
   BulkImageOptimizationResponse,
-  BulkOptimizeAllBrandsResponse,
   BulkOptimizeAllCategoriesResponse,
-  BulkRestoreAllBrandsResponse,
   BulkRestoreAllCategoriesResponse,
   BulkRestoreAllProductsResponse,
   BulkRestoreResponse,
@@ -163,63 +152,6 @@ export async function fetchCategoryList(params: {
   }) as Promise<CategoriesApiResponse>;
 }
 
-export async function fetchBrandList(params: {
-  page: number;
-  limit: number;
-}) {
-  return ApiCall("brand-images/get-all-brands", {
-    page: params.page,
-    limit: params.limit,
-  }) as Promise<BrandsApiResponse>;
-}
-
-export async function optimizeBrandImage(
-  brand: Pick<Brand, "id" | "name" | "imageUrl" | "optimizationStatus">,
-) {
-  const payload = buildBrandOptimizePayload(brand);
-
-  return ApiCall(
-    "brand-images/optimize-brand",
-    payload,
-  ) as Promise<BrandOptimizeResponse>;
-}
-
-export async function restoreBrandImage(brand: Pick<Brand, "id">) {
-  return ApiCall("brand-images/restore-brand", {
-    brand_id: brand.id,
-  }) as Promise<BrandRestoreResponse>;
-}
-
-export async function bulkOptimizeBrandImages(
-  items: BrandBulkOptimizeItem[],
-  storeHash: string,
-) {
-  return ApiCall("brand-images/bulk-optimize-brands-checkbox", {
-    store_hash: storeHash,
-    brands: items,
-  }) as Promise<BrandBulkOptimizeResponse>;
-}
-
-export async function bulkRestoreBrandImages(
-  items: BrandBulkOptimizeItem[],
-  storeHash: string,
-) {
-  return ApiCall("brand-images/bulk-restore-brands-checkbox", {
-    store_hash: storeHash,
-    brands: items,
-  }) as Promise<BrandBulkRestoreResponse>;
-}
-
-export async function fetchBrandPreviewImageData(params: { brandId: number }) {
-  return ApiCall(
-    "brand-images/get-brand-preview-img-data",
-    {
-      brand_id: params.brandId,
-    },
-    { suppressToast: true },
-  ) as Promise<BrandPreviewImageApiResponse>;
-}
-
 export async function optimizeCategoryImage(
   category: Pick<
     Category,
@@ -246,20 +178,6 @@ export async function bulkOptimizeAllCategories() {
     "category-images/bulk-optimize-categories-all",
     {},
   ) as Promise<BulkOptimizeAllCategoriesResponse>;
-}
-
-export async function bulkOptimizeAllBrands() {
-  return ApiCall(
-    "brand-images/bulk-optimize-brands-all",
-    {},
-  ) as Promise<BulkOptimizeAllBrandsResponse>;
-}
-
-export async function bulkRestoreAllBrands() {
-  return ApiCall(
-    "brand-images/bulk-restore-brands-all",
-    {},
-  ) as Promise<BulkRestoreAllBrandsResponse>;
 }
 
 export async function bulkOptimizeCategoryImages(

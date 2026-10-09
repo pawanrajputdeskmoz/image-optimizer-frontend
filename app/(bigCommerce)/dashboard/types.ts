@@ -16,7 +16,7 @@ export type ImageItem = {
   sortOrder?: number;
 };
 
-export type ImageListType = "product" | "categories" | "brand";
+export type ImageListType = "product" | "categories";
 
 export type Product = {
   id: number;
@@ -444,31 +444,7 @@ export type BulkRestoreAllProductsResponse = {
   error?: string;
 };
 
-export type BulkRestoreAllBrandsResponse = {
-  success?: boolean;
-  message?: string;
-  data?: {
-    queued?: number;
-    skipped?: number;
-    total?: number;
-    job_uuid?: string;
-  };
-  error?: string;
-};
-
 export type BulkOptimizeAllCategoriesResponse = {
-  success?: boolean;
-  message?: string;
-  data?: {
-    queued?: number;
-    skipped?: number;
-    total?: number;
-    job_uuid?: string;
-  };
-  error?: string;
-};
-
-export type BulkOptimizeAllBrandsResponse = {
   success?: boolean;
   message?: string;
   data?: {
@@ -555,174 +531,6 @@ export type CategoriesApiResponse = {
   error?: string;
 };
 
-export type ApiBrand = {
-  id: number;
-  name: string;
-  page_title?: string;
-  image_url?: string | null;
-  custom_url?: { url?: string; is_customized?: boolean } | null;
-  has_image?: boolean;
-  storefront_url?: string | null;
-  optimization_status?: string;
-  image_update_status?: string;
-  size?: ApiImageSize;
-};
-
-export type Brand = {
-  id: number;
-  name: string;
-  imageUrl: string;
-  optimizedUrl: string | null;
-  hasImage: boolean;
-  storefrontUrl: string | null;
-  optimizationStatus: string;
-  imageUpdateStatus: string;
-  sizeLabel: string;
-  isOptimized: boolean;
-};
-
-export type BrandsApiResponse = {
-  success?: boolean;
-  message?: string;
-  data?: ApiBrand[];
-  pagination?: {
-    total_pages?: number;
-    current_page?: number;
-    total?: number;
-    count?: number;
-    per_page?: number;
-  };
-  error?: string;
-};
-
-export type BrandOptimizePayload = {
-  channel_id: number;
-  brand_id: number;
-  image_url: string;
-  brand_name: string;
-  optimization_status?: string;
-};
-
-export type BrandOptimizeResultData = {
-  brand_id?: number;
-  brand_name?: string | null;
-  image_url?: string;
-  old_image_url?: string;
-  new_image_url?: string;
-  optimized_url?: string | null;
-  status?: string;
-  optimization_status?: string;
-  optimized_size?: number | null;
-  error_message?: string | null;
-  optimizedImage?: {
-    original?: OptimizedImageMetrics;
-    optimized?: OptimizedImageMetrics;
-    compression?: {
-      savedBytes?: number;
-      savedPercent?: number;
-    };
-  };
-};
-
-export type BrandOptimizeResponse = {
-  success?: boolean;
-  skipped?: boolean;
-  message?: string;
-  data?: BrandOptimizeResultData;
-  error?: string;
-};
-
-export type BrandBulkOptimizeItem = {
-  brand_id: number;
-  image_url: string;
-  brand_name: string;
-  optimization_status?: string;
-};
-
-export type BrandBulkOptimizePayload = {
-  store_hash: string;
-  brands: BrandBulkOptimizeItem[];
-};
-
-export type BrandBulkOptimizeResponse = {
-  success?: boolean;
-  message?: string;
-  data?: {
-    queued?: number;
-    skipped?: number;
-    job_uuid?: string;
-  };
-  error?: string;
-};
-
-export type BrandBulkRestoreResponse = {
-  success?: boolean;
-  message?: string;
-  data?: {
-    queued?: number;
-    skipped?: number;
-    job_uuid?: string;
-  };
-  error?: string;
-};
-
-export type BrandRestoreResultData = {
-  brand_id?: number;
-  channel_id?: number;
-  brand_name?: string;
-  restored_image_url?: string;
-  original_url?: string;
-  verified?: boolean;
-  original_size?: number;
-  original_width?: number;
-  original_height?: number;
-  original_format?: string;
-  status?: string;
-  message?: string;
-};
-
-export type BrandRestoreResponse = {
-  success?: boolean;
-  message?: string;
-  data?: BrandRestoreResultData;
-  error?: string;
-};
-
-export type BrandPreviewImageData = {
-  brand_id?: number;
-  brand_name?: string;
-  channel_id?: number;
-  status?: {
-    optimization_status?: string;
-    image_update_status?: string;
-    optimization_started_at?: string;
-    optimized_at?: string;
-  };
-  imageData?: {
-    original?: OptimizedImageMetrics;
-    optimized?: OptimizedImageMetrics;
-    saved_bytes?: number;
-    saved_percentage?: number;
-    original_url?: string;
-    optimized_url?: string;
-  };
-  files?: {
-    original?: string | null;
-    optimized?: string | null;
-  };
-  urls?: {
-    original?: string | null;
-    optimized?: string | null;
-  };
-};
-
-export type BrandPreviewImageApiResponse = {
-  success?: boolean;
-  data?: BrandPreviewImageData;
-  message?: string;
-  error?: string;
-};
-
 export type DashboardStatCard = {
   value: number;
   display: string;
@@ -732,7 +540,6 @@ export type DashboardStatCard = {
 export type ActiveBulkFlags = {
   product?: boolean;
   category?: boolean;
-  brand?: boolean;
 };
 
 export type ClientDashboardStatsData = {

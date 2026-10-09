@@ -1,5 +1,3 @@
-import { readChannelId } from "@/app/_lib/channelStorage";
-
 export const QUALITY_MIN = 50;
 export const QUALITY_MAX = 100;
 
@@ -77,7 +75,6 @@ export const FORMAT_OPTIONS: FormatOption[] = [
 ];
 
 export type SettingsRow = {
-  channel_id: number;
   optimization_mode: OptimizationModeValue;
   optimize_image_enabled: boolean;
   is_filename_template_enabled: boolean;
@@ -134,14 +131,12 @@ export function parseSettings(data: unknown): SettingsRow | null {
     return null;
   }
 
-  const cid = Number(d.channel_id);
   const optimizeImageEnabled = bool(d.optimize_image_enabled);
   const altTextEnabled = bool(d.is_alt_text_template_enabled);
   const optimizationMode =
     normalizeOptimizationMode(d.optimization_mode) ??
     deriveOptimizationMode(optimizeImageEnabled, altTextEnabled);
   return {
-    channel_id: Number.isFinite(cid) ? cid : readChannelId(),
     optimization_mode: optimizationMode,
     optimize_image_enabled: optimizeImageEnabled,
     is_filename_template_enabled: bool(d.is_filename_template_enabled),
@@ -157,9 +152,8 @@ export function parseSettings(data: unknown): SettingsRow | null {
   };
 }
 
-export function applyDefaults(channel: number): SettingsRow {
+export function applyDefaults(): SettingsRow {
   return {
-    channel_id: channel,
     optimization_mode: "optimize_and_alt",
     optimize_image_enabled: true,
     is_filename_template_enabled: true,
