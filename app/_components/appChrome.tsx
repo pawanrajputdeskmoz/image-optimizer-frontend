@@ -9,8 +9,9 @@ import ReduxProvider from "@/app/store/provider";
 export default function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
+  const isDirectHome = pathname === "/";
 
-  if (isAdmin) {
+  if (isAdmin || isDirectHome) {
     return <>{children}</>;
   }
 
